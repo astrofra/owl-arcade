@@ -5,6 +5,13 @@ from classic_levenshtein import levenshtein_distance
 from xmltodict import parse
 
 
+def is_excluded(filename):
+    excluded_filenames = ['.gitkeep', '.git', '.gitignore']
+    if filename in excluded_filenames:
+        return True
+    return False
+
+
 def beautify_filename(title):
     for ext_list in ['.zip', '.ZIP', '.Zip']:
         title = title.replace(ext_list, '')
@@ -37,10 +44,11 @@ def parse_generic_zip_games(rom_path):
 
     for i in tqdm(range(len(rom_list))):
         rom_filename = rom_list[i]
-        title = rom_filename
-        for ext_list in ['.zip', '.ZIP', '.Zip']:
-            title = title.replace(ext_list, '')
-        game_list.append({'title': title, 'filename': [rom_filename]})
+        if not is_excluded(rom_filename):
+            title = rom_filename
+            for ext_list in ['.zip', '.ZIP', '.Zip']:
+                title = title.replace(ext_list, '')
+            game_list.append({'title': title, 'filename': [rom_filename]})
 
     game_list.sort(key=get_rom_title)
     return game_list
@@ -50,7 +58,13 @@ def parse_amiga_games():
     print("Building Amiga Game List")
     rom_path = path.join(getcwd(), pardir, 'roms/amiga/')
 
-    rom_list = listdir(rom_path)
+    temp_rom_list = listdir(rom_path)
+    rom_list = [] 
+
+    for temp_filename in temp_rom_list:
+        if not is_excluded(temp_filename):
+            rom_list.append(temp_filename)
+
     rom_list.sort()
     d = levenshtein_distance(rom_list[0], rom_list[1])
     game_list = []
@@ -59,7 +73,6 @@ def parse_amiga_games():
     rom_list.append('***end***')
     rom_idx = 0
     while rom_idx < len(rom_list):
-#        game_list.append(rom_list[rom_idx])
         game_list.append({'title': beautify_filename(rom_list[rom_idx]), 'filename': [rom_list[rom_idx]]})
         for other_rom_idx in range(rom_idx + 1, len(rom_list)):
             a = rom_list[rom_idx]
@@ -115,16 +128,17 @@ def parse_mame_games():
     # list rom files
     for rom_idx in tqdm(range(len(rom_list))):
         rom_filename = rom_list[rom_idx]
-        rom_name = rom_filename.replace('.zip', '')
-        # iterate on all entries of mame.xml
-        for key, value in mame_list.items():
-            # iterate on all games among these entries
-            for idx, ex in enumerate(mame_list[key]['game']):
-                # look the rom name
-                if str(ex['@name']) == rom_name:
-                    # find the rom description (title)
-                    title = str(ex['description'])
-                    game_list.append({'title': title, 'filename': [rom_filename]})
+        if not is_excluded(rom_filename):
+            rom_name = rom_filename.replace('.zip', '')
+            # iterate on all entries of mame.xml
+            for key, value in mame_list.items():
+                # iterate on all games among these entries
+                for idx, ex in enumerate(mame_list[key]['game']):
+                    # look the rom name
+                    if str(ex['@name']) == rom_name:
+                        # find the rom description (title)
+                        title = str(ex['description'])
+                        game_list.append({'title': title, 'filename': [rom_filename]})
 
     game_list.sort(key=get_rom_title)
     return game_list
