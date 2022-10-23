@@ -1,0 +1,107 @@
+{
+	"canvas": {
+		"clear_color": true,
+		"clear_z": true,
+		"color": [
+			0,
+			0,
+			0,
+			255
+		]
+	},
+	"environment": {
+		"ambient": [
+			0,
+			0,
+			0,
+			0
+		],
+		"brdf_map": "core/pbr/brdf.dds",
+		"current_camera": null,
+		"fog_color": [
+			0,
+			0,
+			0,
+			0
+		],
+		"fog_far": 0.0,
+		"fog_near": 0.0,
+		"irradiance_map": "core/pbr/night_sky.hdr.irradiance",
+		"radiance_map": "core/pbr/night_sky.hdr.radiance"
+	},
+	"instances": [
+		{
+			"name": "props/monitor/monitor.scn"
+		},
+		{
+			"name": "props/joystick/joystick.scn"
+		}
+	],
+	"key_values": null,
+	"nodes": [
+		{
+			"components": [
+				0,
+				4294967295,
+				4294967295,
+				4294967295,
+				4294967295
+			],
+			"disabled": false,
+			"idx": 0,
+			"instance": 0,
+			"name": "monitor"
+		},
+		{
+			"components": [
+				1,
+				4294967295,
+				4294967295,
+				4294967295,
+				4294967295
+			],
+			"disabled": false,
+			"idx": 9,
+			"instance": 1,
+			"name": "joystick"
+		}
+	],
+	"transforms": [
+		{
+			"parent": null,
+			"pos": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rot": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scl": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		{
+			"parent": null,
+			"pos": [
+				-0.12839367985725403,
+				0.0,
+				-0.39337649941444397
+			],
+			"rot": [
+				-0.0,
+				-179.99998474121094,
+				0.0
+			],
+			"scl": [
+				0.9999999403953552,
+				1.0,
+				0.9999999403953552
+			]
+		}
+	]
+}
