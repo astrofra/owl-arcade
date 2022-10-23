@@ -11,7 +11,7 @@ def fetch_binaries(harfang_version="3.2.4", architecture="win-x64"):
     makedirs(name=bin_dest, exist_ok=True)
 
     # assetc
-    assetc_url_src = binary_src_root + "v{v0}/assetc-win-x64-{v1}.zip".format(v0=harfang_version, v1=harfang_version)
+    assetc_url_src = binary_src_root + "v{a}/assetc-{b}-{c}.zip".format(a=harfang_version, b=architecture,  c=harfang_version)
     makedirs(name=path.join(bin_dest, "assetc"), exist_ok=True)
     tmp_zip_file = "assetc.zip"
     zip_file_dest = path.join(bin_dest, tmp_zip_file)
