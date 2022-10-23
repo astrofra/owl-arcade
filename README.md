@@ -16,6 +16,7 @@ Yet Another Retro Arcade/Emulator Front-End :floppy_disk: :computer: :joystick:
 ## Specifications
 * Runs on [Python3](https://www.python.org)
 * Built on top of [HARFANG 3D](https://www.harfang3d.com)
+* Rendering pipeline powered by [BGFX](https://github.com/bkaradzic/bgfx)
 * Supported operating systems
    * MS Windows 10 x64
    * Ubuntu x64 `WIP`
