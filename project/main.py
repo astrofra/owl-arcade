@@ -22,7 +22,8 @@ def machine_get_name(machine):
 
 def scene_load_machine_assets_from_index(hg, scene, res, machines, current_machine_idx):
     if machines[current_machine_idx]['path'] is not None:
-        return hg.CreateInstanceFromAssets(scene, hg.Mat4.Identity, "machines/" + machines[current_machine_idx]['path'], res, hg.GetForwardPipelineInfo())
+        n, _ = hg.CreateInstanceFromAssets(scene, hg.Mat4.Identity, "machines/" + machines[current_machine_idx]['path'], res, hg.GetForwardPipelineInfo())
+        return n
     else:
         return scene.CreateNode()
 
