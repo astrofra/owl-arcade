@@ -141,7 +141,7 @@ def main():
     hg.WindowSystemInit()
 
     res_ref_x, res_ref_y = 1280, 720
-    res_multiplier = 0.8
+    res_multiplier = 1.0
     res_x, res_y = int(res_ref_x * res_multiplier), int(res_ref_y * res_multiplier)
     win = hg.NewWindow('OWL ARCADE', res_x, res_y, 32, 0) # hg.WV_Fullscreen)
     hg.RenderInit(win)
