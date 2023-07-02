@@ -143,4 +143,4 @@ def fetch_binaries(python_version="3.10.8", harfang_version="3.2.4"):
     with open(pth_file, 'w') as f:
         f.write(file_str)
 
-fetch_binaries()
+# fetch_binaries()
