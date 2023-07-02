@@ -5,6 +5,7 @@ except:
 from classic_levenshtein import levenshtein_distance
 from os import getcwd, path, pardir, listdir
 
+from fetch_binaries import fetch_mame_binary
 from commands import start_amiga, start_mame, start_amstrad_cpc, init_temp_folder
 from rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
 
@@ -122,6 +123,8 @@ def main():
     # start_amstrad_cpc(['Wild Streets (1990)(Titus).zip'])
     # exit()
 
+    # fetch_mame_binary(path.join("bin", "emulators", "mame"))
+
     for idx, machine in enumerate(machines):
         if machines[idx]['parser'] is not None:
             machines[idx]['games'] = machines[idx]['parser']()
@@ -157,9 +160,9 @@ def main():
     glyphs_str += "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ "
     glyphs_str += "¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
 
-    font_machine_name = hg.LoadFontFromFile('assets/fonts/ROBOTO-THIN.TTF', int(96 * res_x / res_ref_x))
-    font_game_title = hg.LoadFontFromFile('assets/fonts/ROBOTO-MEDIUM.TTF', int(24 * res_x / res_ref_x), 1024, 1, glyphs_str)
-    font_prg = hg.LoadProgramFromFile('assets/core/shader/font')
+    font_machine_name = hg.LoadFontFromAssets('fonts/ROBOTO-THIN.TTF', int(96 * res_x / res_ref_x))
+    font_game_title = hg.LoadFontFromAssets('fonts/ROBOTO-MEDIUM.TTF', int(24 * res_x / res_ref_x), 1024, 1, glyphs_str)
+    font_prg = hg.LoadProgramFromAssets('core/shader/font')
 
     # text uniforms and render state
     text_uniform_values = [hg.MakeUniformSetValue('u_color', hg.Vec4(1, 1, 1))]
