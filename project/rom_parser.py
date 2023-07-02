@@ -1,4 +1,4 @@
-from os import getcwd, path, pardir, listdir
+from os import getcwd, path, pardir, listdir, mkdir
 from tqdm import tqdm
 from xmltodict import parse
 from classic_levenshtein import levenshtein_distance
@@ -39,6 +39,9 @@ def get_rom_title(game):
 
 
 def parse_generic_zip_games(rom_path):
+    if not path.exists(rom_path):
+        mkdir(rom_path)
+
     rom_list = listdir(rom_path)
     game_list = []
 
@@ -56,70 +59,71 @@ def parse_generic_zip_games(rom_path):
 
 def parse_amiga_games():
     print("Building Amiga Game List")
-    rom_path = path.join(getcwd(), pardir, 'roms/amiga/')
+    rom_path = path.join(getcwd(), 'roms/amiga/')
 
     temp_rom_list = listdir(rom_path)
     rom_list = [] 
+    game_list = []
 
     for temp_filename in temp_rom_list:
         if not is_excluded(temp_filename):
             rom_list.append(temp_filename)
 
-    rom_list.sort()
-    d = levenshtein_distance(rom_list[0], rom_list[1])
-    game_list = []
+    if len(rom_list) > 0:
+        rom_list.sort()
+        d = levenshtein_distance(rom_list[0], rom_list[1])
 
-    # look for a
-    rom_list.append('***end***')
-    rom_idx = 0
-    while rom_idx < len(rom_list):
-        game_list.append({'title': beautify_filename(rom_list[rom_idx]), 'filename': [rom_list[rom_idx]]})
-        for other_rom_idx in range(rom_idx + 1, len(rom_list)):
-            a = rom_list[rom_idx]
-            b = rom_list[other_rom_idx]
-            if levenshtein_distance(rom_list[rom_idx], rom_list[other_rom_idx]) > 2:
-                if other_rom_idx - rom_idx > 1:
-                    for i in range(rom_idx + 1 , other_rom_idx):
-                        game_list[-1]['filename'].append(rom_list[i])
-                rom_idx = other_rom_idx - 1
-                break
-        rom_idx += 1
+        # look for a
+        rom_list.append('***end***')
+        rom_idx = 0
+        while rom_idx < len(rom_list):
+            game_list.append({'title': beautify_filename(rom_list[rom_idx]), 'filename': [rom_list[rom_idx]]})
+            for other_rom_idx in range(rom_idx + 1, len(rom_list)):
+                a = rom_list[rom_idx]
+                b = rom_list[other_rom_idx]
+                if levenshtein_distance(rom_list[rom_idx], rom_list[other_rom_idx]) > 2:
+                    if other_rom_idx - rom_idx > 1:
+                        for i in range(rom_idx + 1 , other_rom_idx):
+                            game_list[-1]['filename'].append(rom_list[i])
+                    rom_idx = other_rom_idx - 1
+                    break
+            rom_idx += 1
 
-    game_list = game_list[:-1]
-    # print(game_list)
+        game_list = game_list[:-1]
+        # print(game_list)
 
     return game_list
 
 
 def parse_apple_2_games():
     print("Building Apple // Game List")
-    rom_path = path.join(getcwd(), pardir, 'roms/apple_2/')
+    rom_path = path.join(getcwd(), 'roms/apple_2/')
     return parse_generic_zip_games(rom_path)
 
 
 def parse_trs_80_games():
     print("Building TANDY TRS 80 Game List")
-    rom_path = path.join(getcwd(), pardir, 'roms/tandy_trs_80/')
+    rom_path = path.join(getcwd(), 'roms/tandy_trs_80/')
     return parse_generic_zip_games(rom_path)
 
 
 def parse_amstrad_cpc_games():
     print("Building AMSTRAD CPC Game List")
-    rom_path = path.join(getcwd(), pardir, 'roms/amstrad_cpc/')
+    rom_path = path.join(getcwd(), 'roms/amstrad_cpc/')
     return parse_generic_zip_games(rom_path)
 
 
 def parse_sega_megadrive_games():
     print("Building SEGA MEGADRIVE Game List")
-    rom_path = path.join(getcwd(), pardir, 'roms/sega_megadrive/')
+    rom_path = path.join(getcwd(), 'roms/sega_megadrive/')
     return parse_generic_zip_games(rom_path)
 
 
 def parse_mame_games():
-    with open('mame.xml') as f:
+    with open( path.join(getcwd(), 'project', 'mame.xml')) as f:
         mame_list = parse(f.read())
 
-    rom_path = path.join(getcwd(), pardir, 'roms/mame/')
+    rom_path = path.join(getcwd(), 'roms/mame/')
     rom_list = listdir(rom_path)
     game_list = []
 

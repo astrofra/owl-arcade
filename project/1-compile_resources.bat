@@ -1,2 +1,2 @@
-..\bin\assetc\assetc.exe resources assets -daemon
+python -m harfang.bin assetc resources assets
 pause

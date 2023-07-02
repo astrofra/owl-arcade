@@ -150,7 +150,7 @@ def main():
     pipeline = hg.CreateForwardPipeline()
     res = hg.PipelineResources()
 
-    hg.AddAssetsFolder("assets")
+    hg.AddAssetsFolder("project/assets")
 
     # load font and shader program
     glyphs_str = ""
