@@ -1,8 +1,46 @@
 from os import getcwd, path, remove, makedirs
 from shutil import copyfileobj
+from zipfile import ZipFile, BadZipFile
 import requests
 import zipfile
+import subprocess
 
+def fetch_mame_binary(local_path):
+    url = "https://github.com/mamedev/mame/releases/download/mame0256/mame0256b_64bit.exe"
+    exe_name = "mame.exe"
+    
+    exe_path = path.join(local_path, exe_name)
+
+    if path.exists(exe_path):
+        print(f"'{exe_name}' already exists in the directory '{local_path}'. Skipping download.")
+        return
+    
+    download_path = path.join(local_path, url.split("/")[-1])
+    r = requests.get(url, stream=True)
+    if r.status_code == 200:
+        makedirs(local_path, exist_ok=True)  # create directory if it does not exist
+        with open(download_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024): 
+                if chunk:
+                    f.write(chunk)
+        print(f"File downloaded and saved as '{url.split('/')[-1]}' in the directory '{local_path}'.")
+        
+        # Attempt to extract
+        try:
+            subprocess.call([path.join('bin', '7z', '7z.exe'), 'x', download_path, f'-o{local_path}'])
+            print("File extracted successfully.")
+        except Exception as e:
+            print(f"Failed to extract the file: {e}")
+    else:
+        print(f"Failed to download the file. Status code: {r.status_code}")
+
+
+
+# download_file(
+#     "https://github.com/mamedev/mame/releases/download/mame0256/mame0256b_64bit.exe",
+#     os.path.join("bin", "emulators", "mame"),
+#     "mame.exe"
+# )
 
 def fetch_binaries(python_version="3.10.8", harfang_version="3.2.4"):
     bin_dest = path.join(getcwd(), "bin")
