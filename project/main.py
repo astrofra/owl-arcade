@@ -8,6 +8,7 @@ from os import getcwd, path, pardir, listdir
 from fetch_binaries import fetch_mame_binary
 from commands import start_amiga, start_mame, start_amstrad_cpc, init_temp_folder
 from rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
+from fetch_pouet_prods import fetch_pouet_prods
 
 # 3D models by : Georg Klein, Darren.Hogan, Dekogon, kotkozyrkov, pbr3d, Gamereadyassets, cggoor, Shrednector, Tornado Studio, Attilad, abramsdesign
 # Sounds by : DWOBoyle, neezen, schluppipuppie, Speedenza
@@ -107,18 +108,21 @@ def dt_step(dt, vec_src, vec_dst):
 
 def main():
     machines = [
-                {'name': 'Commodore 64', 'path': 'commodore_64.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Super Nintendo', 'path': 'nintendo_snes.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Apple //e', 'path': 'apple_2_e.scn', 'games': [], 'parser': parse_apple_2_games, 'launcher': None},
-                {'name': 'Atari VCS 2600', 'path': 'atari_vcs_2600.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Tandy TRS-80 III', 'path': 'tandy_trs_80.scn', 'games': [], 'parser': parse_trs_80_games, 'launcher': None},
-                {'name': 'Amstrad CPC 464', 'path': 'amstrad_cpc_464.scn', 'games': [], 'parser': parse_amstrad_cpc_games, 'launcher': start_amstrad_cpc},
-                {'name': 'Nec PC/FX', 'path': 'nec_pcfx.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Arcade', 'path': None, 'games': [], 'parser': parse_mame_games, 'launcher': start_mame},
-                {'name': 'Commodore Amiga', 'path': 'commodore_amiga_500.scn', 'games': [], 'parser': parse_amiga_games, 'launcher': start_amiga},
+                {'name': 'Commodore 64', 'pouet_name': 'Commodore 64', 'path': 'commodore_64.scn', 'games': [], 'parser': None, 'launcher': None},
+                {'name': 'Super Nintendo', 'pouet_name': 'SNES/Super Famicom', 'path': 'nintendo_snes.scn', 'games': [], 'parser': None, 'launcher': None},
+                {'name': 'Apple //e', 'pouet_name': 'Apple II', 'path': 'apple_2_e.scn', 'games': [], 'parser': parse_apple_2_games, 'launcher': None},
+                {'name': 'Atari VCS 2600', 'pouet_name': 'Atari VCS', 'path': 'atari_vcs_2600.scn', 'games': [], 'parser': None, 'launcher': None},
+                {'name': 'Tandy TRS-80 III', 'pouet_name': 'TRS-80/CoCo/Dragon', 'path': 'tandy_trs_80.scn', 'games': [], 'parser': parse_trs_80_games, 'launcher': None},
+                {'name': 'Amstrad CPC 464', 'pouet_name': 'Amstrad CPC', 'path': 'amstrad_cpc_464.scn', 'games': [], 'parser': parse_amstrad_cpc_games, 'launcher': start_amstrad_cpc},
+                {'name': 'Nec PC/FX', 'pouet_name': None, 'path': 'nec_pcfx.scn', 'games': [], 'parser': None, 'launcher': None},
+                {'name': 'Arcade', 'pouet_name': None, 'path': None, 'games': [], 'parser': parse_mame_games, 'launcher': start_mame},
+                {'name': 'Commodore Amiga', 'pouet_name': 'Amiga OCS/ECS', 'path': 'commodore_amiga_500.scn', 'games': [], 'parser': parse_amiga_games, 'launcher': start_amiga},
                 ]
-
     machines.sort(key=machine_get_name)
+
+    # Download and store the database of prods found on pouet
+    machines_pouet = [machine.get('pouet_name') for machine in machines]
+    fetch_pouet_prods(machines_pouet)
 
     # start_amstrad_cpc(['Wild Streets (1990)(Titus).zip'])
     # exit()

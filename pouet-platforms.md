@@ -1,0 +1,101 @@
+# Platforms list according to Pouet.net
+
+Here is the list of the platforms known by the demoscene website :
+
+- Acorn
+- Alambik
+- Amiga AGA
+- Amiga OCS/ECS
+- Amiga PPC/RTG
+- Amstrad CPC
+- Amstrad Plus
+- Android
+- Animation/Video
+- Apple II
+- Apple II GS
+- Atari 7800
+- Atari Falcon 030
+- Atari Jaguar
+- Atari Lynx
+- Atari ST
+- Atari STe
+- Atari TT 030
+- Atari VCS
+- Atari XL/XE
+- BBC Micro
+- BeOS
+- BK-0010/11M
+- C16/116/plus4
+- C64 DTV
+- Commodore 128
+- Commodore 64
+- Commodore PET
+- Dreamcast
+- Enterprise
+- Flash
+- FreeBSD
+- GamePark GP2X
+- GamePark GP32
+- Gameboy
+- Gameboy Advance
+- Gameboy Color
+- Gamecube
+- Intellivision
+- iOS
+- Java
+- JavaScript
+- KC-85
+- Linux
+- MacOS
+- MacOSX Intel
+- MacOSX PPC
+- Mobile Phone
+- MS-Dos
+- MS-Dos/gus
+- MSX
+- MSX 2
+- MSX 2 plus
+- MSX Turbo-R
+- mIRC
+- NEC TurboGrafx/PC Engine
+- NES/Famicom
+- NeoGeo Pocket
+- Nintendo 64
+- Nintendo DS
+- Nintendo Wii
+- Oric
+- PalmOS
+- PHP
+- PICO-8
+- Playstation
+- Playstation 2
+- Playstation 3
+- Playstation Portable
+- PocketPC
+- Pokemon Mini
+- Raspberry Pi
+- SEGA Game Gear
+- SEGA Genesis/Mega Drive
+- SEGA Master System
+- SGI/IRIX
+- Sharp MZ
+- Sinclair QL
+- SNES/Super Famicom
+- Solaris
+- Spectravideo 3x8
+- SAM Coupé
+- TI-8x (68k)
+- TI-8x (Z80)
+- TIC-80
+- Thomson
+- TRS-80/CoCo/Dragon
+- VIC 20
+- Virtual Boy
+- Wild
+- Windows
+- Wonderswan
+- XBOX
+- XBOX 360
+- ZX Spectrum
+- ZX-81
+- ZX Enhanced
