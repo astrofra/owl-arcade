@@ -10,7 +10,7 @@ Yet Another Retro Arcade/Emulator Front-End :floppy_disk: :computer: :joystick:
 * Launch each emulator from the main menu
    * Windows emulators are installed locally
 * Parse automatically the rom/disk folders
-* Bootstrap from an arbitrary list of public domain games
+* Bootstrap from an arbitrary list of public domain ~games~ demos from pouet.net
 * Installs the emulators automatically
 
 ## Specifications
