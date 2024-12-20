@@ -24,3 +24,9 @@ Yet Another Retro Arcade/Emulator Front-End :floppy_disk: :computer: :joystick:
 ## Getting involved
 This project is supposed to contain as much open source as possible.<br>
 License is GPLv3.
+
+## Credits
+
+ - Concept/Code/Layout by [Astrofra](https://github.com/astrofra)
+ - `Nec PC-FX` 3D model by [Mindtrust](https://sketchfab.com/mindrust)
+ - `Amstrad CPC` 3D model by [ebanimations](https://sketchfab.com/ebanimations)
