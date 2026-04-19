@@ -1,10 +1,15 @@
 import harfang as hg
-from classic_levenshtein import levenshtein_distance
-from os import getcwd, path, pardir, listdir
 
-from fetch_binaries import fetch_mame_binary
-from commands import start_amiga, start_mame, start_amstrad_cpc, init_temp_folder
-from rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
+try:
+    from .commands import start_amiga, start_mame, start_amstrad_cpc
+    from .paths import PATHS
+    from .preflight import has_preflight_errors, print_preflight_report, run_preflight
+    from .rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
+except ImportError:
+    from commands import start_amiga, start_mame, start_amstrad_cpc
+    from paths import PATHS
+    from preflight import has_preflight_errors, print_preflight_report, run_preflight
+    from rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
 # from fetch_pouet_prods import fetch_pouet_prods
 
 # 3D models by : Georg Klein, Darren.Hogan, Dekogon, kotkozyrkov, pbr3d, Gamereadyassets, cggoor, Shrednector, Tornado Studio, Attilad, abramsdesign
@@ -99,6 +104,19 @@ def draw_game_selection(hg, view_id, res_x, res_y, y_ratio, font, font_prg, text
                     hg.DTHA_Right, hg.DTVA_Center, text_uniform_values, [], text_render_state)
 
 
+def draw_status_message(hg, view_id, res_x, res_y, font, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state, message):
+    shadow_offset = hg.Vec3(res_x / 500.0, res_y / 500.0, 0)
+    text_pos = hg.Vec3(res_x * 0.5, res_y * 0.16, 0)
+
+    hg.DrawText(view_id, font, message, font_prg, 'u_tex', 0, hg.Mat4.Identity,
+                text_pos + shadow_offset,
+                hg.DTHA_Center, hg.DTVA_Center, text_uniform_values_shadows, [], text_render_state)
+
+    hg.DrawText(view_id, font, message, font_prg, 'u_tex', 0, hg.Mat4.Identity,
+                text_pos,
+                hg.DTHA_Center, hg.DTVA_Center, text_uniform_values, [], text_render_state)
+
+
 def dt_step(dt, vec_src, vec_dst):
     return (vec_dst - vec_src) * dt
 
@@ -107,15 +125,20 @@ def main():
     machines = [
                 {'name': 'Commodore 64', 'pouet_name': 'Commodore 64', 'path': 'commodore_64.scn', 'games': [], 'parser': None, 'launcher': None},
                 {'name': 'Super Nintendo', 'pouet_name': 'SNES/Super Famicom', 'path': 'nintendo_snes.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Apple //e', 'pouet_name': 'Apple II', 'path': 'apple_2_e.scn', 'games': [], 'parser': parse_apple_2_games, 'launcher': None},
+                {'name': 'Apple //e', 'pouet_name': 'Apple II', 'path': 'apple_2_e.scn', 'rom_folder': 'apple_2', 'games': [], 'parser': parse_apple_2_games, 'launcher': None},
                 {'name': 'Atari VCS 2600', 'pouet_name': 'Atari VCS', 'path': 'atari_vcs_2600.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Tandy TRS-80 III', 'pouet_name': 'TRS-80/CoCo/Dragon', 'path': 'tandy_trs_80.scn', 'games': [], 'parser': parse_trs_80_games, 'launcher': None},
-                {'name': 'Amstrad CPC 464', 'pouet_name': 'Amstrad CPC', 'path': 'amstrad_cpc_464.scn', 'games': [], 'parser': parse_amstrad_cpc_games, 'launcher': start_amstrad_cpc},
+                {'name': 'Tandy TRS-80 III', 'pouet_name': 'TRS-80/CoCo/Dragon', 'path': 'tandy_trs_80.scn', 'rom_folder': 'tandy_trs_80', 'games': [], 'parser': parse_trs_80_games, 'launcher': None},
+                {'name': 'Amstrad CPC 464', 'pouet_name': 'Amstrad CPC', 'path': 'amstrad_cpc_464.scn', 'rom_folder': 'amstrad_cpc', 'games': [], 'parser': parse_amstrad_cpc_games, 'launcher': start_amstrad_cpc},
                 {'name': 'Nec PC/FX', 'pouet_name': None, 'path': 'nec_pcfx.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Arcade', 'pouet_name': None, 'path': None, 'games': [], 'parser': parse_mame_games, 'launcher': start_mame},
-                {'name': 'Commodore Amiga', 'pouet_name': 'Amiga OCS/ECS', 'path': 'commodore_amiga_500.scn', 'games': [], 'parser': parse_amiga_games, 'launcher': start_amiga},
+                {'name': 'Arcade', 'pouet_name': None, 'path': None, 'rom_folder': 'mame', 'games': [], 'parser': parse_mame_games, 'launcher': start_mame},
+                {'name': 'Commodore Amiga', 'pouet_name': 'Amiga OCS/ECS', 'path': 'commodore_amiga_500.scn', 'rom_folder': 'amiga', 'games': [], 'parser': parse_amiga_games, 'launcher': start_amiga},
                 ]
     machines.sort(key=machine_get_name)
+
+    preflight_issues = run_preflight(PATHS, machines)
+    print_preflight_report(preflight_issues)
+    if has_preflight_errors(preflight_issues):
+        return 1
 
     # # Download and store the database of prods found on pouet
     # machines_pouet = [machine.get('pouet_name') for machine in machines]
@@ -123,8 +146,6 @@ def main():
 
     # start_amstrad_cpc(['Wild Streets (1990)(Titus).zip'])
     # exit()
-
-    # fetch_mame_binary(path.join("bin", "emulators", "mame"))
 
     for idx, machine in enumerate(machines):
         if machines[idx]['parser'] is not None:
@@ -154,7 +175,7 @@ def main():
     pipeline = hg.CreateForwardPipeline()
     res = hg.PipelineResources()
 
-    hg.AddAssetsFolder("project/assets")
+    hg.AddAssetsFolder(str(PATHS.assets))
 
     # load font and shader program
     glyphs_str = ""
@@ -210,7 +231,7 @@ def main():
     # main loop
     frame = 0
     long_press_timeout = 0
-    processes = []
+    active_process = None
 
     while not hg.ReadKeyboard().Key(hg.K_Escape):
         render_was_reset, res_x, res_y = hg.RenderResetToWindow(win, res_x, res_y, hg.RF_VSync | hg.RF_MSAA4X | hg.RF_MaxAnisotropy)
@@ -222,29 +243,33 @@ def main():
 
         keyboard.Update()
 
-        if keyboard.Pressed(hg.K_Left):
-            slot_change_dir = -1
-        elif keyboard.Pressed(hg.K_Right):
-            slot_change_dir = 1
+        if active_process is not None and active_process.poll() is not None:
+            print(f"Emulator exited with code {active_process.returncode}; resuming Owl Arcade.")
+            active_process = None
 
-        if keyboard.Pressed(hg.K_Up):
-            game_selector_idx -= 1
-        elif keyboard.Pressed(hg.K_Down):
-            game_selector_idx += 1
+        if active_process is None:
+            if keyboard.Pressed(hg.K_Left):
+                slot_change_dir = -1
+            elif keyboard.Pressed(hg.K_Right):
+                slot_change_dir = 1
 
-        if keyboard.Down(hg.K_Up):
-            long_press_timeout += 1
-            if long_press_timeout > 15:
+            if keyboard.Pressed(hg.K_Up):
                 game_selector_idx -= 1
-        elif keyboard.Down(hg.K_Down):
-            long_press_timeout += 1
-            if long_press_timeout > 15:
+            elif keyboard.Pressed(hg.K_Down):
                 game_selector_idx += 1
-        else:
-            long_press_timeout = 0
+
+            if keyboard.Down(hg.K_Up):
+                long_press_timeout += 1
+                if long_press_timeout > 15:
+                    game_selector_idx -= 1
+            elif keyboard.Down(hg.K_Down):
+                long_press_timeout += 1
+                if long_press_timeout > 15:
+                    game_selector_idx += 1
+            else:
+                long_press_timeout = 0
 
         games = machines[current_machine_idx]['games']
-
         if len(games) > 0:
             game_selector_idx = game_selector_idx % len(games)
         else:
@@ -252,10 +277,21 @@ def main():
 
         machine_slot, slot_idx, slot_change_dir, current_machine_idx, camera_velocity = scene_animate_machines(hg, dt, res, scene, camera_parent_node, slot_change_speed, machine_slot, slot_idx, slot_change_dir, machines, current_machine_idx)
 
-        if camera_velocity is not None and hg.Len(camera_velocity) < 0.01:
+        games = machines[current_machine_idx]['games']
+        if len(games) > 0:
+            game_selector_idx = game_selector_idx % len(games)
+        else:
+            game_selector_idx = 0
+
+        if active_process is None and camera_velocity is not None and hg.Len(camera_velocity) < 0.01:
             if keyboard.Pressed(hg.K_Space):
-                if machines[current_machine_idx]['launcher'] is not None:
-                    processes = [machines[current_machine_idx]['launcher'](games[game_selector_idx]['filename'])]
+                current_machine = machines[current_machine_idx]
+                if current_machine['launcher'] is None:
+                    print(f"No launcher is configured for {current_machine['name']}.")
+                elif len(games) == 0:
+                    print(f"No launchable content is available for {current_machine['name']}.")
+                else:
+                    active_process = current_machine['launcher'](games[game_selector_idx]['filename'])
 
         scene.Update(dt)
         view_id, pass_id = hg.SubmitSceneToPipeline(0, scene, hg.IntRect(0, 0, res_x, res_y), True, pipeline, res, pipeline_aaa, pipeline_aaa_config, frame)
@@ -264,16 +300,17 @@ def main():
 
         draw_game_selection(hg, view_id, res_x, res_y, res_y / res_ref_y, font_game_title, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state, games, game_selector_idx)
 
+        if active_process is not None:
+            draw_status_message(hg, view_id, res_x, res_y, font_game_title, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state,
+                                'Emulator running - close it to return to Owl Arcade')
 
         frame = hg.Frame()
         hg.UpdateWindow(win)
 
-        for process in processes:
-            if process is not None:
-                process.wait()
-
     hg.RenderShutdown()
     hg.DestroyWindow(win)
+    return 0
 
 
-main()
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,4 +1,1 @@
-xmltodict==0.12.0
-harfang==3.2.6
-requests
-tqdm
+-r ../requirements.txt

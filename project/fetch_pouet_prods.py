@@ -4,15 +4,22 @@ import requests
 import gzip
 import shutil
 
-def fetch_data():
+try:
+    from .paths import PATHS
+except ImportError:
+    from paths import PATHS
+
+
+def fetch_data(paths=None):
+    paths = paths or PATHS
     response = requests.get('https://data.pouet.net/json.php')
     data = response.json()
     dumps = data['dumps']
     latest_date = max(dumps.keys())
     prods_url = dumps[latest_date]['prods']['url']
-    filename = "_tmp/" + dumps[latest_date]['prods']['filename']
+    filename = paths.temp / dumps[latest_date]['prods']['filename']
     response = requests.get(prods_url, stream=True)
-    os.makedirs('_tmp', exist_ok=True)
+    os.makedirs(paths.temp, exist_ok=True)
     with open(filename, 'wb') as out_file:
         shutil.copyfileobj(response.raw, out_file)
     return filename
@@ -28,11 +35,12 @@ def parse_and_classify(filename, platforms):
                 platform_dict[platform['name']].append(prod)
     return platform_dict
 
-def fetch_pouet_prods(platforms):
-    filename = fetch_data()
+def fetch_pouet_prods(platforms, paths=None):
+    paths = paths or PATHS
+    filename = fetch_data(paths)
     platform_dict = parse_and_classify(filename, platforms)
-    os.makedirs('db', exist_ok=True)
-    with open('db/prods.json', 'w') as f:
+    os.makedirs(paths.db, exist_ok=True)
+    with open(paths.db / 'prods.json', 'w') as f:
         json.dump(platform_dict, f, indent=2)
 
 if __name__ == "__main__":

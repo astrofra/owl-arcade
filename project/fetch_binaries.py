@@ -1,11 +1,20 @@
-from os import getcwd, path, remove, makedirs
+from os import path, remove, makedirs
 from shutil import copyfileobj
 from zipfile import ZipFile, BadZipFile
 import requests
 import zipfile
 import subprocess
 
-def fetch_mame_binary(local_path):
+try:
+    from .paths import PATHS
+except ImportError:
+    from paths import PATHS
+
+
+def fetch_mame_binary(local_path=None):
+    if local_path is None:
+        local_path = PATHS.emulator_folder("mame")
+    local_path = str(local_path)
     url = "https://github.com/mamedev/mame/releases/download/mame0256/mame0256b_64bit.exe"
     exe_name = "mame.exe"
     
@@ -27,7 +36,7 @@ def fetch_mame_binary(local_path):
         
         # Attempt to extract
         try:
-            subprocess.call([path.join('bin', '7z', '7z.exe'), 'x', download_path, f'-o{local_path}'])
+            subprocess.call([str(PATHS.bin / '7z' / '7z.exe'), 'x', download_path, f'-o{local_path}'])
             print("File extracted successfully.")
         except Exception as e:
             print(f"Failed to extract the file: {e}")
@@ -43,7 +52,7 @@ def fetch_mame_binary(local_path):
 # )
 
 def fetch_binaries(python_version="3.10.8", harfang_version="3.2.4"):
-    bin_dest = path.join(getcwd(), "bin")
+    bin_dest = str(PATHS.bin)
     binary_src_root = "https://github.com/harfang3d/harfang3d/releases/download/"
 
     # bin folder
