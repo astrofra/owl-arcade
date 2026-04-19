@@ -260,6 +260,9 @@ def main():
                     print(f"No launcher is configured for {current_machine['name']}.")
                 elif len(productions) == 0:
                     print(f"No launchable content is available for {current_machine['name']}.")
+                elif not productions[production_selector_idx].get("launchable", True):
+                    launch_status = productions[production_selector_idx].get("launch", {}).get("status", "not prepared")
+                    print(f"Selected content is downloaded but not launchable yet: {launch_status}")
                 else:
                     active_process = current_machine['launcher'](productions[production_selector_idx]['filename'])
 

@@ -21,6 +21,16 @@ Yet Another Retro Arcade/Emulator Front-End :floppy_disk: :computer: :joystick:
    * MS Windows 10 x64
    * Ubuntu x64 `WIP`
 
+## Pouet content cache
+
+Fetch the current Pouet dump, select the top ranked Amstrad CPC and Amiga productions, download their archives, and build the local launch manifest:
+
+```bat
+python -m project.fetch_pouet_prods
+```
+
+Downloaded content is stored under `roms/<platform>/_pouet/`, while metadata is stored in `db/pouet-library.json`. Amstrad CPC ZIP archives are inspected for `.dsk` or `.cpr` media and prepared for launch when possible.
+
 ## Getting involved
 This project is supposed to contain as much open source as possible.<br>
 License is GPLv3.

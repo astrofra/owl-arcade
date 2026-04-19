@@ -1,13 +1,17 @@
 import os
 import json
-import requests
 import gzip
 import shutil
+import argparse
+
+import requests
 
 try:
     from .paths import PATHS
+    from .pouet_library import DEFAULT_PLATFORM_KEYS, DEFAULT_TOP_LIMIT, update_pouet_library
 except ImportError:
     from paths import PATHS
+    from pouet_library import DEFAULT_PLATFORM_KEYS, DEFAULT_TOP_LIMIT, update_pouet_library
 
 
 def fetch_data(paths=None):
@@ -43,5 +47,25 @@ def fetch_pouet_prods(platforms, paths=None):
     with open(paths.db / 'prods.json', 'w') as f:
         json.dump(platform_dict, f, indent=2)
 
+
+def fetch_top_pouet_prods(paths=None, platform_keys=None, limit=DEFAULT_TOP_LIMIT, download=True):
+    return update_pouet_library(
+        paths=paths or PATHS,
+        platform_keys=platform_keys or DEFAULT_PLATFORM_KEYS,
+        limit=limit,
+        download=download,
+    )
+
+
 if __name__ == "__main__":
-    fetch_pouet_prods(["Amstrad CPC", "Amiga AGA", "SNES/Super Famicom"])
+    parser = argparse.ArgumentParser(description="Fetch and cache top Pouet productions for Owl Arcade.")
+    parser.add_argument("--platform", action="append", dest="platforms", help="Platform key to fetch, e.g. amstrad_cpc or amiga.")
+    parser.add_argument("--limit", type=int, default=DEFAULT_TOP_LIMIT, help="Number of ranked prods to keep per platform.")
+    parser.add_argument("--metadata-only", action="store_true", help="Build the manifest without downloading prod archives.")
+    args = parser.parse_args()
+
+    fetch_top_pouet_prods(
+        platform_keys=args.platforms or DEFAULT_PLATFORM_KEYS,
+        limit=args.limit,
+        download=not args.metadata_only,
+    )

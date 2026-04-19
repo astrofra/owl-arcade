@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 /project/assets
+/_temp/
+/_tmp/
+/db/*.json
+/roms/*/_pouet/

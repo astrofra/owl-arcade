@@ -1,12 +1,14 @@
 import io
+import json
 import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
+from zipfile import ZipFile
 
-from project import commands, platforms, rom_parser
+from project import commands, platforms, pouet_library, rom_parser
 from project.paths import ProjectPaths
 from project.preflight import ERROR, WARNING, run_preflight
 
@@ -50,6 +52,34 @@ class FirstRunStabilityTests(unittest.TestCase):
                 self.assertFalse((elsewhere / "roms").exists())
             finally:
                 os.chdir(original_cwd)
+
+    def test_parser_ignores_pouet_storage_folder_and_loads_manifest_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            rom_folder = paths.rom_folder("amstrad_cpc")
+            media_folder = rom_folder / "_pouet" / "123-demo" / "media"
+            media_folder.mkdir(parents=True)
+            (media_folder / "demo.dsk").write_text("")
+            paths.db.mkdir(parents=True)
+            with (paths.db / "pouet-library.json").open("w") as manifest_file:
+                json.dump(
+                    {
+                        "platforms": {
+                            "amstrad_cpc": [
+                                {
+                                    "title": "Pouet Demo",
+                                    "filename": ["_pouet/123-demo/media/demo.dsk"],
+                                    "launchable": True,
+                                }
+                            ]
+                        }
+                    },
+                    manifest_file,
+                )
+
+            entries = rom_parser.parse_amstrad_cpc_games(paths)
+
+            self.assertEqual(entries, [{"title": "Pouet Demo", "filename": ["_pouet/123-demo/media/demo.dsk"], "launchable": True}])
 
     def test_command_builders_use_absolute_repo_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -165,6 +195,58 @@ class FirstRunStabilityTests(unittest.TestCase):
         visible = platforms.visible_production_entries(productions, 10, limit=5)
 
         self.assertEqual([entry["title"] for entry in visible], ["Demo 10", "Demo 11", "Demo 0", "Demo 1", "Demo 2"])
+
+    def test_pouet_top_selection_uses_rank_and_platform(self):
+        prods = [
+            {"id": "1", "name": "Other", "rank": "1", "download": "https://example.invalid/other.zip", "platforms": {"1": {"name": "PC"}}},
+            {"id": "2", "name": "Second", "rank": "20", "download": "https://example.invalid/second.zip", "platforms": {"2": {"name": "Amstrad CPC"}}},
+            {"id": "3", "name": "First", "rank": "10", "download": "https://example.invalid/first.zip", "platforms": {"2": {"name": "Amstrad CPC"}}},
+            {"id": "4", "name": "No Download", "rank": "2", "platforms": {"2": {"name": "Amstrad CPC"}}},
+        ]
+
+        selected = pouet_library.select_top_prods(prods, ["Amstrad CPC"], limit=2)
+
+        self.assertEqual([prod["id"] for prod in selected], ["3", "2"])
+
+    def test_pouet_download_urls_are_normalized_for_storage(self):
+        self.assertEqual(
+            pouet_library.normalize_download_url("https://files.scene.org/view/parties/demo.zip"),
+            "https://files.scene.org/get/parties/demo.zip",
+        )
+        self.assertEqual(
+            pouet_library.filename_from_url("http://example.invalid/fetch.php?media=tmp:demo.zip", "fallback.bin"),
+            "demo.zip",
+        )
+
+    def test_pouet_zip_media_is_extracted_to_launchable_manifest_entry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            config = pouet_library.PLATFORM_CONFIGS["amstrad_cpc"]
+            prod = {
+                "id": "123",
+                "name": "Demo",
+                "rank": "1",
+                "download": "https://example.invalid/demo.zip",
+                "platforms": {"1": {"name": "Amstrad CPC"}},
+                "groups": [{"name": "Group"}],
+            }
+            prod_folder = pouet_library.platform_storage_folder(paths, config, prod)
+            archive_path = prod_folder / "demo.zip"
+            archive_path.parent.mkdir(parents=True)
+            with ZipFile(archive_path, "w") as archive:
+                archive.writestr("disk/Demo disk 1 side B.dsk", b"side b")
+                archive.writestr("disk/Demo disk 1 side A.dsk", b"side a")
+
+            entry = pouet_library.build_manifest_entry(prod, config, paths)
+            launch_info = pouet_library.prepare_launch_media(paths, config, archive_path)
+            entry["launchable"] = launch_info["launchable"]
+            entry["launch"]["status"] = launch_info["status"]
+            entry["launch"]["media"] = pouet_library.relative_to_rom_folder(paths, config, launch_info["media_path"])
+            entry["filename"] = [entry["launch"]["media"]]
+
+            self.assertTrue(entry["launchable"])
+            self.assertEqual(entry["filename"], ["_pouet/123-demo/media/Demo disk 1 side A.dsk"])
+            self.assertTrue((paths.rom_folder("amstrad_cpc") / entry["filename"][0]).exists())
 
     def test_amstrad_autocmd_falls_back_to_cpm_for_bin_only_disks(self):
         with patch("project.commands._inspect_amstrad_disk", return_value=[{"filename": "DISC.BIN", "score": 0}]):

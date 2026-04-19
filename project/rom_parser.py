@@ -6,12 +6,14 @@ from xmltodict import parse
 try:
     from .classic_levenshtein import levenshtein_distance
     from .paths import PATHS
+    from .pouet_library import load_platform_entries
 except ImportError:
     from classic_levenshtein import levenshtein_distance
     from paths import PATHS
+    from pouet_library import load_platform_entries
 
 
-EXCLUDED_FILENAMES = {".gitkeep", ".git", ".gitignore"}
+EXCLUDED_FILENAMES = {".gitkeep", ".git", ".gitignore", "_pouet"}
 
 
 def is_excluded(filename):
@@ -19,10 +21,9 @@ def is_excluded(filename):
 
 
 def beautify_filename(title):
-    for ext_list in [".zip", ".ZIP", ".Zip"]:
-        title = title.replace(ext_list, "")
-    for ext_list in [".adf", ".ADF", ".Adf"]:
-        title = title.replace(ext_list, "")
+    for extension in [".zip", ".adf", ".adz", ".ipf", ".dsk", ".cpr", ".sna", ".cdt", ".lha"]:
+        if title.lower().endswith(extension):
+            title = title[: -len(extension)]
 
     if title.find("(") > -1 and title.rfind(")") > -1:
         title_detail = title[title.rfind("("):title.rfind(")") + 1]
@@ -48,16 +49,13 @@ def parse_generic_zip_games(rom_path):
     rom_path = Path(rom_path)
     rom_path.mkdir(parents=True, exist_ok=True)
 
-    rom_list = sorted(path.name for path in rom_path.iterdir())
+    rom_list = sorted(path.name for path in rom_path.iterdir() if path.is_file())
     game_list = []
 
     for i in tqdm(range(len(rom_list))):
         rom_filename = rom_list[i]
         if not is_excluded(rom_filename):
-            title = rom_filename
-            for ext_list in [".zip", ".ZIP", ".Zip"]:
-                title = title.replace(ext_list, "")
-            game_list.append({"title": title, "filename": [rom_filename]})
+            game_list.append({"title": beautify_filename(rom_filename), "filename": [rom_filename]})
 
     game_list.sort(key=get_rom_title)
     return game_list
@@ -82,7 +80,7 @@ def parse_amiga_games(paths=None):
         game_list.append({"title": beautify_filename(rom_list[rom_idx]), "filename": group})
         rom_idx = other_rom_idx
 
-    return game_list
+    return game_list + load_platform_entries(paths, "amiga")
 
 
 def parse_apple_2_games(paths=None):
@@ -100,7 +98,7 @@ def parse_trs_80_games(paths=None):
 def parse_amstrad_cpc_games(paths=None):
     paths = paths or PATHS
     print("Building AMSTRAD CPC Game List")
-    return parse_generic_zip_games(paths.rom_folder("amstrad_cpc"))
+    return parse_generic_zip_games(paths.rom_folder("amstrad_cpc")) + load_platform_entries(paths, "amstrad_cpc")
 
 
 def parse_sega_megadrive_games(paths=None):
