@@ -73,7 +73,7 @@ def run_preflight(paths=None, machines=None):
             issues.append(_issue(WARNING, "empty_rom_folder", f"ROM folder has no launchable content: {folder_name}", rom_folder))
 
     for machine in machines:
-        scene_path = machine.get("path")
+        scene_path = machine.get("scene_path") or machine.get("path")
         if scene_path is not None:
             asset_path = paths.assets / "machines" / scene_path
             if not asset_path.exists():

@@ -273,7 +273,7 @@ def _amstrad_autocmd_from_disk(dsk_file, selected_filename, paths):
     disk_files = _score_amstrad_disk_files(disk_files, selected_filename)
     print(disk_files)
 
-    if len(disk_files) > 0:
+    if len(disk_files) > 0 and disk_files[0]["score"] >= 0:
         return 'run"' + disk_files[0]["filename"].split(".")[0].strip(" ")
     return "|cpm"
 

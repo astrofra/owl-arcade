@@ -1,15 +1,13 @@
 import harfang as hg
 
 try:
-    from .commands import start_amiga, start_mame, start_amstrad_cpc
     from .paths import PATHS
+    from .platforms import build_machine_catalog, load_machine_productions, machine_productions
     from .preflight import has_preflight_errors, print_preflight_report, run_preflight
-    from .rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
 except ImportError:
-    from commands import start_amiga, start_mame, start_amstrad_cpc
     from paths import PATHS
+    from platforms import build_machine_catalog, load_machine_productions, machine_productions
     from preflight import has_preflight_errors, print_preflight_report, run_preflight
-    from rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
 # from fetch_pouet_prods import fetch_pouet_prods
 
 # 3D models by : Georg Klein, Darren.Hogan, Dekogon, kotkozyrkov, pbr3d, Gamereadyassets, cggoor, Shrednector, Tornado Studio, Attilad, abramsdesign
@@ -20,13 +18,10 @@ def sfx_play_woosh(hg):
     src_ref = hg.PlayStereo(snd_ref, hg.StereoSourceState(1, hg.SR_Once))
 
 
-def machine_get_name(machine):
-    return machine.get('name')
-
-
 def scene_load_machine_assets_from_index(hg, scene, res, machines, current_machine_idx):
-    if machines[current_machine_idx]['path'] is not None:
-        n, _ = hg.CreateInstanceFromAssets(scene, hg.Mat4.Identity, "machines/" + machines[current_machine_idx]['path'], res, hg.GetForwardPipelineInfo())
+    scene_path = machines[current_machine_idx].get('scene_path') or machines[current_machine_idx].get('path')
+    if scene_path is not None:
+        n, _ = hg.CreateInstanceFromAssets(scene, hg.Mat4.Identity, "machines/" + scene_path, res, hg.GetForwardPipelineInfo())
         return n
     else:
         return scene.CreateNode()
@@ -76,21 +71,21 @@ def draw_machine_name(hg, view_id, res_x, res_y, font, font_prg, text_uniform_va
                 hg.DTHA_Right, hg.DTVA_Center, text_uniform_values, [], text_render_state)
 
 
-def draw_game_selection(hg, view_id, res_x, res_y, y_ratio, font, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state, games, idx):
+def draw_production_selection(hg, view_id, res_x, res_y, y_ratio, font, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state, productions, idx):
     # 2D view, note that only the depth buffer is cleared
     hg.SetView2D(view_id, 0, 0, res_x, res_y, -1, 1, hg.CF_Depth, hg.ColorI(32, 32, 32), 1, 0)
     selector_size = 10
     shadow_offset = hg.Vec3(res_x / 500.0, res_y / 500.0, 0)
 
-    if len(games) > 0:
+    if len(productions) > 0:
         for i in range(selector_size):
-            j = (i + idx) % len(games)
-            game_title = games[j]['title']
-            hg.DrawText(view_id, font, game_title, font_prg, 'u_tex', 0, hg.Mat4.Identity,
+            j = (i + idx) % len(productions)
+            production_title = productions[j]['title']
+            hg.DrawText(view_id, font, production_title, font_prg, 'u_tex', 0, hg.Mat4.Identity,
                         hg.Vec3(res_x * 0.05, res_y * (0.45 + (i * 0.04 * y_ratio)), 0) + shadow_offset,
                         hg.DTHA_Left, hg.DTVA_Center, text_uniform_values_shadows, [], text_render_state)
 
-            hg.DrawText(view_id, font, game_title, font_prg, 'u_tex', 0, hg.Mat4.Identity,
+            hg.DrawText(view_id, font, production_title, font_prg, 'u_tex', 0, hg.Mat4.Identity,
                         hg.Vec3(res_x * 0.05, res_y * (0.45 + (i * 0.04 * y_ratio)), 0),
                         hg.DTHA_Left, hg.DTVA_Center, text_uniform_values, [], text_render_state)
 
@@ -122,18 +117,7 @@ def dt_step(dt, vec_src, vec_dst):
 
 
 def main():
-    machines = [
-                {'name': 'Commodore 64', 'pouet_name': 'Commodore 64', 'path': 'commodore_64.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Super Nintendo', 'pouet_name': 'SNES/Super Famicom', 'path': 'nintendo_snes.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Apple //e', 'pouet_name': 'Apple II', 'path': 'apple_2_e.scn', 'rom_folder': 'apple_2', 'games': [], 'parser': parse_apple_2_games, 'launcher': None},
-                {'name': 'Atari VCS 2600', 'pouet_name': 'Atari VCS', 'path': 'atari_vcs_2600.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Tandy TRS-80 III', 'pouet_name': 'TRS-80/CoCo/Dragon', 'path': 'tandy_trs_80.scn', 'rom_folder': 'tandy_trs_80', 'games': [], 'parser': parse_trs_80_games, 'launcher': None},
-                {'name': 'Amstrad CPC 464', 'pouet_name': 'Amstrad CPC', 'path': 'amstrad_cpc_464.scn', 'rom_folder': 'amstrad_cpc', 'games': [], 'parser': parse_amstrad_cpc_games, 'launcher': start_amstrad_cpc},
-                {'name': 'Nec PC/FX', 'pouet_name': None, 'path': 'nec_pcfx.scn', 'games': [], 'parser': None, 'launcher': None},
-                {'name': 'Arcade', 'pouet_name': None, 'path': None, 'rom_folder': 'mame', 'games': [], 'parser': parse_mame_games, 'launcher': start_mame},
-                {'name': 'Commodore Amiga', 'pouet_name': 'Amiga OCS/ECS', 'path': 'commodore_amiga_500.scn', 'rom_folder': 'amiga', 'games': [], 'parser': parse_amiga_games, 'launcher': start_amiga},
-                ]
-    machines.sort(key=machine_get_name)
+    machines = build_machine_catalog()
 
     preflight_issues = run_preflight(PATHS, machines)
     print_preflight_report(preflight_issues)
@@ -144,22 +128,9 @@ def main():
     # machines_pouet = [machine.get('pouet_name') for machine in machines]
     # fetch_pouet_prods(machines_pouet)
 
-    # start_amstrad_cpc(['Wild Streets (1990)(Titus).zip'])
-    # exit()
+    load_machine_productions(machines, PATHS)
 
-    for idx, machine in enumerate(machines):
-        if machines[idx]['parser'] is not None:
-            machines[idx]['games'] = machines[idx]['parser']()
-        else:
-            machines[idx]['games'] = []
-    # games = []
-    # games = parse_mame_roms()
-    # games = parse_apple_2_games()
-
-    # games = machines[0]['games']
-    # print([machines[0]['launcher'](games[0]['filename'])])
-
-    game_selector_idx = 0
+    production_selector_idx = 0
 
     hg.InputInit()
     hg.AudioInit()
@@ -183,7 +154,7 @@ def main():
     glyphs_str += "¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
 
     font_machine_name = hg.LoadFontFromAssets('fonts/ROBOTO-THIN.TTF', int(96 * res_x / res_ref_x))
-    font_game_title = hg.LoadFontFromAssets('fonts/ROBOTO-MEDIUM.TTF', int(24 * res_x / res_ref_x), 1024, 1, glyphs_str)
+    font_production_title = hg.LoadFontFromAssets('fonts/ROBOTO-MEDIUM.TTF', int(24 * res_x / res_ref_x), 1024, 1, glyphs_str)
     font_prg = hg.LoadProgramFromAssets('core/shader/font')
 
     # text uniforms and render state
@@ -254,54 +225,54 @@ def main():
                 slot_change_dir = 1
 
             if keyboard.Pressed(hg.K_Up):
-                game_selector_idx -= 1
+                production_selector_idx -= 1
             elif keyboard.Pressed(hg.K_Down):
-                game_selector_idx += 1
+                production_selector_idx += 1
 
             if keyboard.Down(hg.K_Up):
                 long_press_timeout += 1
                 if long_press_timeout > 15:
-                    game_selector_idx -= 1
+                    production_selector_idx -= 1
             elif keyboard.Down(hg.K_Down):
                 long_press_timeout += 1
                 if long_press_timeout > 15:
-                    game_selector_idx += 1
+                    production_selector_idx += 1
             else:
                 long_press_timeout = 0
 
-        games = machines[current_machine_idx]['games']
-        if len(games) > 0:
-            game_selector_idx = game_selector_idx % len(games)
+        productions = machine_productions(machines[current_machine_idx])
+        if len(productions) > 0:
+            production_selector_idx = production_selector_idx % len(productions)
         else:
-            game_selector_idx = 0
+            production_selector_idx = 0
 
         machine_slot, slot_idx, slot_change_dir, current_machine_idx, camera_velocity = scene_animate_machines(hg, dt, res, scene, camera_parent_node, slot_change_speed, machine_slot, slot_idx, slot_change_dir, machines, current_machine_idx)
 
-        games = machines[current_machine_idx]['games']
-        if len(games) > 0:
-            game_selector_idx = game_selector_idx % len(games)
+        productions = machine_productions(machines[current_machine_idx])
+        if len(productions) > 0:
+            production_selector_idx = production_selector_idx % len(productions)
         else:
-            game_selector_idx = 0
+            production_selector_idx = 0
 
         if active_process is None and camera_velocity is not None and hg.Len(camera_velocity) < 0.01:
             if keyboard.Pressed(hg.K_Space):
                 current_machine = machines[current_machine_idx]
                 if current_machine['launcher'] is None:
                     print(f"No launcher is configured for {current_machine['name']}.")
-                elif len(games) == 0:
+                elif len(productions) == 0:
                     print(f"No launchable content is available for {current_machine['name']}.")
                 else:
-                    active_process = current_machine['launcher'](games[game_selector_idx]['filename'])
+                    active_process = current_machine['launcher'](productions[production_selector_idx]['filename'])
 
         scene.Update(dt)
         view_id, pass_id = hg.SubmitSceneToPipeline(0, scene, hg.IntRect(0, 0, res_x, res_y), True, pipeline, res, pipeline_aaa, pipeline_aaa_config, frame)
 
         draw_machine_name(hg, view_id, res_x, res_y, font_machine_name, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state, machines[current_machine_idx]['name'])
 
-        draw_game_selection(hg, view_id, res_x, res_y, res_y / res_ref_y, font_game_title, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state, games, game_selector_idx)
+        draw_production_selection(hg, view_id, res_x, res_y, res_y / res_ref_y, font_production_title, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state, productions, production_selector_idx)
 
         if active_process is not None:
-            draw_status_message(hg, view_id, res_x, res_y, font_game_title, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state,
+            draw_status_message(hg, view_id, res_x, res_y, font_production_title, font_prg, text_uniform_values_shadows, text_uniform_values, text_render_state,
                                 'Emulator running - close it to return to Owl Arcade')
 
         frame = hg.Frame()

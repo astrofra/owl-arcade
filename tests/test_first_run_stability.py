@@ -6,7 +6,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from project import commands, rom_parser
+from project import commands, platforms, rom_parser
 from project.paths import ProjectPaths
 from project.preflight import ERROR, WARNING, run_preflight
 
@@ -124,6 +124,48 @@ class FirstRunStabilityTests(unittest.TestCase):
 
             self.assertIs(process, expected_process)
             self.assertEqual(popen.call_args.kwargs["cwd"], str(caprice))
+
+    def test_machine_catalog_is_sorted_and_uses_production_slots(self):
+        machines = platforms.build_machine_catalog()
+        names = [machine["name"] for machine in machines]
+
+        self.assertEqual(names, sorted(names))
+        self.assertTrue(all("productions" in machine for machine in machines))
+        self.assertFalse(any("games" in machine for machine in machines))
+        amstrad = next(machine for machine in machines if machine["name"] == "Amstrad CPC 464")
+        self.assertEqual(amstrad["scene_path"], "amstrad_cpc_464.scn")
+        self.assertEqual(amstrad["rom_folder"], "amstrad_cpc")
+        self.assertIs(amstrad["launcher"], commands.start_amstrad_cpc)
+
+    def test_load_machine_productions_passes_project_paths_to_parser(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            seen_paths = []
+
+            def parser(parser_paths):
+                seen_paths.append(parser_paths)
+                return [{"title": "Demo", "filename": ["demo.zip"]}]
+
+            machines = platforms.build_machine_catalog([
+                platforms.MachineDefinition("Demo Machine", rom_folder="demo", parser=parser),
+            ])
+
+            platforms.load_machine_productions(machines, paths)
+
+            self.assertEqual(seen_paths, [paths])
+            self.assertEqual(machines[0]["productions"], [{"title": "Demo", "filename": ["demo.zip"]}])
+
+    def test_amstrad_autocmd_falls_back_to_cpm_for_bin_only_disks(self):
+        with patch("project.commands._inspect_amstrad_disk", return_value=[{"filename": "DISC.BIN", "score": 0}]):
+            autocmd = commands._amstrad_autocmd_from_disk(Path("demo.dsk"), "Gryzor (CPM).dsk", object())
+
+        self.assertEqual(autocmd, "|cpm")
+
+    def test_amstrad_autocmd_prefers_basic_loader(self):
+        with patch("project.commands._inspect_amstrad_disk", return_value=[{"filename": "DEMO.BAS", "score": 0}]):
+            autocmd = commands._amstrad_autocmd_from_disk(Path("demo.dsk"), "Demo.dsk", object())
+
+        self.assertEqual(autocmd, 'run"DEMO')
 
 
 if __name__ == "__main__":
