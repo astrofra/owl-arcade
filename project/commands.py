@@ -29,7 +29,7 @@ def _missing_paths(required_paths):
     return [Path(required_path) for required_path in required_paths if not Path(required_path).exists()]
 
 
-def _start_process(label, command, required_paths, paths):
+def _start_process(label, command, required_paths, paths, cwd=None):
     missing = _missing_paths(required_paths)
     if missing:
         print(f"Cannot start {label}; missing required file(s):")
@@ -40,7 +40,7 @@ def _start_process(label, command, required_paths, paths):
     command = _stringify_command(command)
     print(command)
     try:
-        return subprocess.Popen(command, cwd=str(paths.repo_root))
+        return subprocess.Popen(command, cwd=str(cwd or paths.repo_root))
     except OSError as exc:
         print(f"Cannot start {label}: {exc}")
         return None
@@ -302,10 +302,10 @@ def start_amstrad_cpc(disk_filename, paths=None):
         config_path = caprice / "cap32_6128plus.cfg"
         command = build_amstrad_cpc_command(filenames, paths, config_path=config_path, media_path=source_media)
         required_paths = [caprice_exe, config_path, source_media]
-        return _start_process("Amstrad CPC", command, required_paths, paths)
+        return _start_process("Amstrad CPC", command, required_paths, paths, cwd=caprice)
 
     config_path = caprice / "cap32.cfg"
     launcher_cmd = _amstrad_autocmd_from_disk(dsk_file, selected_filename, paths)
     command = build_amstrad_cpc_command(filenames, paths, autocmd=launcher_cmd, config_path=config_path, media_path=source_media)
     required_paths = [caprice_exe, config_path, source_media]
-    return _start_process("Amstrad CPC", command, required_paths, paths)
+    return _start_process("Amstrad CPC", command, required_paths, paths, cwd=caprice)

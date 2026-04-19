@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from project import commands, rom_parser
 from project.paths import ProjectPaths
@@ -105,6 +106,24 @@ class FirstRunStabilityTests(unittest.TestCase):
             self.assertIsNone(process)
             self.assertIn("Cannot start MAME", output.getvalue())
             self.assertIn("mame.exe", output.getvalue())
+
+    def test_amstrad_launcher_runs_caprice_from_emulator_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            caprice = paths.emulator_folder("caprice")
+            rom_folder = paths.rom_folder("amstrad_cpc")
+            caprice.mkdir(parents=True)
+            rom_folder.mkdir(parents=True)
+            (caprice / "cap32.exe").write_text("")
+            (caprice / "cap32.cfg").write_text("")
+            (rom_folder / "demo.dsk").write_text("")
+
+            expected_process = object()
+            with patch("project.commands.subprocess.Popen", return_value=expected_process) as popen:
+                process = commands.start_amstrad_cpc(["demo.dsk"], paths)
+
+            self.assertIs(process, expected_process)
+            self.assertEqual(popen.call_args.kwargs["cwd"], str(caprice))
 
 
 if __name__ == "__main__":
