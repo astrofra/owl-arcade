@@ -1,14 +1,11 @@
-try:
-    import harfang as hg
-except:
-    pass
+import harfang as hg
 from classic_levenshtein import levenshtein_distance
 from os import getcwd, path, pardir, listdir
 
 from fetch_binaries import fetch_mame_binary
 from commands import start_amiga, start_mame, start_amstrad_cpc, init_temp_folder
 from rom_parser import parse_apple_2_games, parse_trs_80_games, parse_amstrad_cpc_games, parse_mame_games, parse_amiga_games
-from fetch_pouet_prods import fetch_pouet_prods
+# from fetch_pouet_prods import fetch_pouet_prods
 
 # 3D models by : Georg Klein, Darren.Hogan, Dekogon, kotkozyrkov, pbr3d, Gamereadyassets, cggoor, Shrednector, Tornado Studio, Attilad, abramsdesign
 # Sounds by : DWOBoyle, neezen, schluppipuppie, Speedenza
@@ -120,9 +117,9 @@ def main():
                 ]
     machines.sort(key=machine_get_name)
 
-    # Download and store the database of prods found on pouet
-    machines_pouet = [machine.get('pouet_name') for machine in machines]
-    fetch_pouet_prods(machines_pouet)
+    # # Download and store the database of prods found on pouet
+    # machines_pouet = [machine.get('pouet_name') for machine in machines]
+    # fetch_pouet_prods(machines_pouet)
 
     # start_amstrad_cpc(['Wild Streets (1990)(Titus).zip'])
     # exit()

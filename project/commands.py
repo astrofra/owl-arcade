@@ -70,23 +70,27 @@ def start_amstrad_cpc(disk_filename):
     print("game_filename = " + game_filename)
 
     # extract the .dsk from a zip, if needed
-    with ZipFile(game_filename, 'r') as zip_ref:
-        zip_ref.extractall(temp_folder_path())
+    if game_filename.find(".zip") > -1:
+        with ZipFile(game_filename, 'r') as zip_ref:
+            zip_ref.extractall(temp_folder_path())
 
-    # get the .dsk file
-    dsk_file = None
-    for file in listdir(temp_folder_path()):
-        if file.lower().find('.dsk') > -1:
-            dsk_file = file
-            break
+        # get the .dsk file
+        dsk_file = None
+        for file in listdir(temp_folder_path()):
+            if file.lower().find('.dsk') > -1:
+                dsk_file = file
+                break
+    else:
+        dsk_file = game_filename
 
     if dsk_file is not None:
         print("dsk_file = " + dsk_file)
 
-        dsk_file = path.join(temp_folder_path(), dsk_file).replace('\\', '/')
-        safe_dsk_file = path.join(temp_folder_path(), 'cpcgame.dsk')
-        move(dsk_file, safe_dsk_file)
-        print("safe_dsk_file = " + safe_dsk_file)
+        # dsk_file = path.join(temp_folder_path(), dsk_file).replace('\\', '/')
+        # safe_dsk_file = path.join(temp_folder_path(), 'cpcgame.dsk')
+        # move(dsk_file, safe_dsk_file)
+        # print("safe_dsk_file = " + safe_dsk_file)
+        safe_dsk_file = dsk_file
 
         # extract the file catalog from the disk
         popen_cmd = ["..\\bin\\emulators\\caprice\\tools\\cpcxfs\\cpcxfsw.exe", safe_dsk_file, '-d']
