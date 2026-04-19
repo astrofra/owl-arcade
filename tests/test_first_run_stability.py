@@ -13,6 +13,44 @@ from project.paths import ProjectPaths
 from project.preflight import ERROR, WARNING, run_preflight
 
 
+class StaticRaw:
+    def __init__(self, content):
+        self.content = content
+
+    def read(self, size=-1, decode_content=False):
+        if size is None or size < 0:
+            return self.content
+        return self.content[:size]
+
+
+class StaticResponse:
+    def __init__(self, url, body="", content_type="text/html"):
+        self.url = url
+        self.status_code = 200
+        self.headers = {"Content-Type": content_type}
+        self.encoding = "utf-8"
+        self.raw = StaticRaw(body.encode("utf-8"))
+
+    def raise_for_status(self):
+        return None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class StaticHtmlSession:
+    def __init__(self, pages):
+        self.pages = pages
+        self.calls = []
+
+    def get(self, url, stream=False, timeout=None):
+        self.calls.append(url)
+        return StaticResponse(url, self.pages.get(url, ""))
+
+
 class FirstRunStabilityTests(unittest.TestCase):
     def test_project_paths_are_repo_root_based(self):
         original_cwd = Path.cwd()
@@ -218,6 +256,30 @@ class FirstRunStabilityTests(unittest.TestCase):
             "demo.zip",
         )
 
+    def test_pouet_scene_org_candidates_include_https_mirrors(self):
+        session = StaticHtmlSession({
+            "https://files.scene.org/view/parties/demo.zip": "<a href='https://files.scene.org/browse/parties/'>browse</a>",
+        })
+        candidates = pouet_library.resolve_download_candidates(
+            "https://files.scene.org/view/parties/demo.zip",
+            session=session,
+        )
+
+        self.assertIn("https://files.scene.org/get/parties/demo.zip", candidates)
+        self.assertIn("https://files.scene.org/get:de-https/parties/demo.zip", candidates)
+        self.assertEqual(session.calls, ["https://files.scene.org/view/parties/demo.zip"])
+
+    def test_pouet_candidate_resolver_walks_html_links_recursively(self):
+        session = StaticHtmlSession({
+            "https://example.invalid/start": "<a href='/level1'>level1</a>",
+            "https://example.invalid/level1": "<a href='/level2'>level2</a>",
+            "https://example.invalid/level2": "<a href='/files/demo.zip'>demo</a>",
+        })
+
+        candidates = pouet_library.resolve_download_candidates("https://example.invalid/start", session=session, max_depth=3)
+
+        self.assertIn("https://example.invalid/files/demo.zip", candidates)
+
     def test_pouet_zip_media_is_extracted_to_launchable_manifest_entry(self):
         with tempfile.TemporaryDirectory() as tmp:
             paths = ProjectPaths(Path(tmp) / "repo")
@@ -247,6 +309,21 @@ class FirstRunStabilityTests(unittest.TestCase):
             self.assertTrue(entry["launchable"])
             self.assertEqual(entry["filename"], ["_pouet/123-demo/media/Demo disk 1 side A.dsk"])
             self.assertTrue((paths.rom_folder("amstrad_cpc") / entry["filename"][0]).exists())
+
+    def test_pouet_zip_with_unsupported_compression_does_not_abort_prepare(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            config = pouet_library.PLATFORM_CONFIGS["amstrad_cpc"]
+            archive_path = paths.rom_folder("amstrad_cpc") / "_pouet" / "demo" / "demo.zip"
+            archive_path.parent.mkdir(parents=True)
+            with ZipFile(archive_path, "w") as archive:
+                archive.writestr("demo.dsk", b"disk")
+
+            with patch("project.pouet_library._extract_zip_media", side_effect=ValueError("cannot extract demo.dsk")):
+                launch_info = pouet_library.prepare_launch_media(paths, config, archive_path)
+
+            self.assertFalse(launch_info["launchable"])
+            self.assertEqual(launch_info["status"], "cannot extract demo.dsk")
 
     def test_amstrad_autocmd_falls_back_to_cpm_for_bin_only_disks(self):
         with patch("project.commands._inspect_amstrad_disk", return_value=[{"filename": "DISC.BIN", "score": 0}]):

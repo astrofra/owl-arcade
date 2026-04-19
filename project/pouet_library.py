@@ -5,8 +5,9 @@ import re
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse, urlunparse
+from urllib.parse import parse_qs, unquote, urljoin, urlparse, urlunparse
 from zipfile import BadZipFile, ZipFile
 
 import requests
@@ -21,6 +22,10 @@ POUET_INDEX_URL = "https://data.pouet.net/json.php"
 MANIFEST_FILENAME = "pouet-library.json"
 DEFAULT_PLATFORM_KEYS = ["amstrad_cpc", "amiga"]
 DEFAULT_TOP_LIMIT = 50
+MAX_LINK_RESOLUTION_DEPTH = 3
+MAX_HTML_BYTES = 1024 * 512
+MAX_RESOLVER_PAGES = 12
+ARCHIVE_EXTENSIONS = (".zip", ".dsk", ".cpr", ".adf", ".adz", ".ipf", ".dms", ".lha", ".lzh", ".rar", ".7z", ".gz")
 
 
 @dataclass(frozen=True)
@@ -45,6 +50,20 @@ PLATFORM_CONFIGS = {
         media_extensions=(".adf", ".adz", ".ipf", ".dms"),
     ),
 }
+
+
+class LinkExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "a":
+            return
+        attrs = dict(attrs)
+        href = attrs.get("href")
+        if href:
+            self.links.append(href)
 
 
 def manifest_path(paths=None):
@@ -169,12 +188,128 @@ def filename_from_url(url, fallback):
     return filename or fallback
 
 
+def has_archive_extension(url):
+    filename = filename_from_url(url, "")
+    return Path(filename).suffix.lower() in ARCHIVE_EXTENSIONS
+
+
 def normalize_download_url(url):
     parsed_url = urlparse(url)
     if parsed_url.netloc.lower() == "files.scene.org" and parsed_url.path.startswith("/view/"):
         parsed_url = parsed_url._replace(path="/get/" + parsed_url.path[len("/view/") :])
         return urlunparse(parsed_url)
     return url
+
+
+def _add_candidate(candidates, seen, url):
+    if not url or url in seen:
+        return
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return
+    seen.add(url)
+    candidates.append(url)
+
+
+def _scene_org_direct_candidates(url):
+    parsed = urlparse(url)
+    if parsed.netloc.lower() != "files.scene.org":
+        return []
+
+    if parsed.path.startswith("/view/"):
+        path = parsed.path[len("/view/") :]
+    elif parsed.path.startswith("/get/"):
+        path = parsed.path[len("/get/") :]
+    else:
+        return []
+
+    return [
+        urlunparse(parsed._replace(path="/get/" + path)),
+        urlunparse(parsed._replace(path="/get:de-https/" + path)),
+        urlunparse(parsed._replace(path="/get:fi-https/" + path)),
+        urlunparse(parsed._replace(path="/get:hu-https/" + path)),
+        urlunparse(parsed._replace(path="/get:jp-https/" + path)),
+        urlunparse(parsed._replace(path="/get:us-http/" + path)),
+    ]
+
+
+def _extract_html_links(html, base_url):
+    parser = LinkExtractor()
+    parser.feed(html)
+    links = []
+    for href in parser.links:
+        if href.startswith(("mailto:", "javascript:", "#")):
+            continue
+        links.append(urljoin(base_url, href))
+    return links
+
+
+def _should_follow_html_link(source_url, link_url):
+    source = urlparse(source_url)
+    link = urlparse(link_url)
+    if link.scheme not in ("http", "https"):
+        return False
+    if link.netloc.lower() == "files.scene.org":
+        return link.path.startswith("/view/")
+    if link.netloc.lower() != source.netloc.lower():
+        return False
+    if link.path.endswith("/"):
+        return False
+    return True
+
+
+def _looks_like_html_response(response):
+    return "text/html" in response.headers.get("Content-Type", "").lower()
+
+
+def resolve_download_candidates(url, session=None, max_depth=MAX_LINK_RESOLUTION_DEPTH):
+    session = session or requests.Session()
+    candidates = []
+    candidate_seen = set()
+    page_seen = set()
+    queue = [(url, 0)]
+
+    for candidate in _scene_org_direct_candidates(url):
+        _add_candidate(candidates, candidate_seen, candidate)
+    _add_candidate(candidates, candidate_seen, normalize_download_url(url))
+
+    while queue:
+        page_url, depth = queue.pop(0)
+        if depth > max_depth or page_url in page_seen or len(page_seen) >= MAX_RESOLVER_PAGES:
+            continue
+        page_seen.add(page_url)
+
+        parsed = urlparse(page_url)
+        if parsed.scheme not in ("http", "https"):
+            continue
+        if has_archive_extension(page_url) and parsed.netloc.lower() != "files.scene.org":
+            _add_candidate(candidates, candidate_seen, page_url)
+            continue
+
+        try:
+            response = session.get(page_url, stream=True, timeout=30)
+            response.raise_for_status()
+        except requests.RequestException:
+            continue
+
+        with response:
+            final_url = response.url
+            if not _looks_like_html_response(response):
+                _add_candidate(candidates, candidate_seen, final_url)
+                continue
+
+            html = response.raw.read(MAX_HTML_BYTES, decode_content=True).decode(response.encoding or "utf-8", errors="replace")
+
+        for link in _extract_html_links(html, final_url):
+            for candidate in _scene_org_direct_candidates(link):
+                _add_candidate(candidates, candidate_seen, candidate)
+            normalized_link = normalize_download_url(link)
+            if has_archive_extension(normalized_link) or "/get" in urlparse(normalized_link).path:
+                _add_candidate(candidates, candidate_seen, normalized_link)
+            elif depth < max_depth and _should_follow_html_link(final_url, normalized_link):
+                queue.append((normalized_link, depth + 1))
+
+    return candidates
 
 
 def platform_storage_folder(paths, config, prod):
@@ -216,8 +351,14 @@ def build_manifest_entry(prod, config, paths):
     }
 
 
-def download_artifact(url, destination, session=None):
-    url = normalize_download_url(url)
+def _candidate_destination(candidate_url, destination):
+    candidate_filename = filename_from_url(candidate_url, destination.name)
+    if candidate_filename and (destination.suffix.lower() in ("", ".php") or Path(candidate_filename).suffix.lower() in ARCHIVE_EXTENSIONS):
+        return destination.parent / candidate_filename
+    return destination
+
+
+def _download_artifact_candidate(url, destination, session=None):
     parsed_url = urlparse(url)
     if parsed_url.scheme not in ("http", "https"):
         return {"ok": False, "status": f"unsupported URL scheme: {parsed_url.scheme}"}
@@ -243,6 +384,23 @@ def download_artifact(url, destination, session=None):
     return {"ok": True, "status": "downloaded", "path": destination}
 
 
+def download_artifact(url, destination, session=None):
+    session = session or requests.Session()
+    errors = []
+    for candidate_url in resolve_download_candidates(url, session=session):
+        candidate_destination = _candidate_destination(candidate_url, destination)
+        try:
+            result = _download_artifact_candidate(candidate_url, candidate_destination, session=session)
+        except requests.RequestException as exc:
+            errors.append(f"{candidate_url}: {exc}")
+            continue
+        if result["ok"]:
+            result["url"] = candidate_url
+            return result
+        errors.append(f"{candidate_url}: {result['status']}")
+    return {"ok": False, "status": "download failed" + (f": {'; '.join(errors[:3])}" if errors else ""), "path": destination}
+
+
 def filename_from_content_disposition(value):
     if not value:
         return None
@@ -258,6 +416,8 @@ def cached_artifact_is_usable(path):
     try:
         with ZipFile(path, "r") as archive:
             return archive.testzip() is None
+    except NotImplementedError:
+        return True
     except BadZipFile:
         path.unlink(missing_ok=True)
         return False
@@ -292,9 +452,13 @@ def _extract_zip_media(archive_path, member_name, destination_folder):
     if media_path.exists() and media_path.stat().st_size > 0:
         return media_path
 
-    with ZipFile(archive_path, "r") as archive:
-        with archive.open(member_name) as source, media_path.open("wb") as target:
-            shutil.copyfileobj(source, target)
+    try:
+        with ZipFile(archive_path, "r") as archive:
+            with archive.open(member_name) as source, media_path.open("wb") as target:
+                shutil.copyfileobj(source, target)
+    except (NotImplementedError, RuntimeError) as exc:
+        media_path.unlink(missing_ok=True)
+        raise ValueError(f"cannot extract {member_name}: {exc}") from exc
     return media_path
 
 
@@ -323,7 +487,10 @@ def prepare_launch_media(paths, config, archive_path):
         return {"launchable": False, "status": "zip does not contain launchable media", "media_path": None}
 
     media_members.sort(key=media_member_sort_key)
-    media_path = _extract_zip_media(archive_path, media_members[0], archive_path.parent / "media")
+    try:
+        media_path = _extract_zip_media(archive_path, media_members[0], archive_path.parent / "media")
+    except ValueError as exc:
+        return {"launchable": False, "status": str(exc), "media_path": None}
     return {
         "launchable": True,
         "status": "ready",
