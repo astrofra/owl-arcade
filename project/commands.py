@@ -230,6 +230,89 @@ def _parse_samdisk_catalog(lines):
     return disk_files
 
 
+def _valid_amstrad_dir_text(value):
+    return all(char == 32 or 48 <= char <= 57 or 65 <= char <= 90 or char in (35, 36, 38, 39, 45, 64, 94, 95) for char in value)
+
+
+def _parse_amstrad_directory_entries(data):
+    disk_files = []
+    seen = set()
+    for offset in range(0, len(data) - 31, 32):
+        entry = data[offset:offset + 32]
+        user = entry[0]
+        if user >= 16:
+            continue
+
+        name_bytes = bytes(char & 0x7f for char in entry[1:9])
+        extension_bytes = bytes(char & 0x7f for char in entry[9:12])
+        if not _valid_amstrad_dir_text(name_bytes) or not _valid_amstrad_dir_text(extension_bytes):
+            continue
+
+        name = name_bytes.decode("ascii", errors="ignore").strip()
+        extension = extension_bytes.decode("ascii", errors="ignore").strip()
+        record_count = entry[15]
+        blocks = [block for block in entry[16:32] if block not in (0, 0xE5)]
+
+        if not name or (record_count == 0 and not blocks):
+            continue
+
+        filename = f"{name}.{extension}" if extension else f"{name}."
+        if filename not in seen:
+            seen.add(filename)
+            disk_files.append({"filename": filename, "score": 0})
+    return disk_files
+
+
+def _amstrad_dsk_track_chunks(dsk_file, max_tracks=8):
+    try:
+        data = Path(dsk_file).read_bytes()
+    except OSError as exc:
+        print(f"Cannot inspect Amstrad CPC disk image: {exc}")
+        return []
+
+    chunks = []
+    if data.startswith(b"EXTENDED CPC DSK File"):
+        track_count = data[0x30]
+        side_count = max(data[0x31], 1)
+        track_sizes = data[0x34:0x34 + (track_count * side_count)]
+        offset = 0x100
+        for track_idx, track_size_blocks in enumerate(track_sizes):
+            track_size = track_size_blocks * 0x100
+            if track_size <= 0:
+                continue
+            if track_idx >= max_tracks:
+                break
+            chunk = data[offset:offset + track_size]
+            if chunk:
+                chunks.append(chunk)
+            offset += track_size
+        return chunks
+
+    if data.startswith(b"MV - CPCEMU Disk-File"):
+        track_count = data[0x30]
+        side_count = max(data[0x31], 1)
+        track_size = int.from_bytes(data[0x32:0x34], "little")
+        offset = 0x100
+        for _ in range(min(track_count * side_count, max_tracks)):
+            chunk = data[offset:offset + track_size]
+            if chunk:
+                chunks.append(chunk)
+            offset += track_size
+    return chunks
+
+
+def _scan_amstrad_disk_directory(dsk_file):
+    disk_files = []
+    seen = set()
+    for chunk in _amstrad_dsk_track_chunks(dsk_file):
+        sector_data = chunk[0x100:]
+        for disk_file in _parse_amstrad_directory_entries(sector_data):
+            if disk_file["filename"] not in seen:
+                seen.add(disk_file["filename"])
+                disk_files.append(disk_file)
+    return disk_files
+
+
 def _inspect_amstrad_disk(dsk_file, paths):
     caprice = paths.emulator_folder("caprice")
     cpcxfs = caprice / "tools" / "cpcxfs" / "cpcxfsw.exe"
@@ -246,6 +329,9 @@ def _inspect_amstrad_disk(dsk_file, paths):
             disk_files = _parse_samdisk_catalog(_run_catalog_command([samdisk, "list", dsk_file], paths))
         else:
             print(f"Amstrad CPC fallback catalog tool is missing: {samdisk}")
+
+    if len(disk_files) == 0:
+        disk_files = _scan_amstrad_disk_directory(dsk_file)
 
     return disk_files
 

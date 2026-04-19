@@ -260,6 +260,31 @@ class FirstRunStabilityTests(unittest.TestCase):
 
         self.assertEqual(autocmd, 'run"DEMO')
 
+    def test_amstrad_raw_directory_scan_finds_extensionless_loader(self):
+        directory = bytearray([0xE5] * 512)
+        directory[0:32] = b"\x00PHX        \x00\x00\x00\x10\x02\x03" + (b"\x00" * 14)
+
+        self.assertEqual(commands._parse_amstrad_directory_entries(directory), [{"filename": "PHX.", "score": 0}])
+
+    def test_amstrad_autocmd_uses_raw_directory_when_catalog_tools_fail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dsk_path = Path(tmp) / "phX.dsk"
+            header = bytearray(256)
+            header[: len(b"EXTENDED CPC DSK File\r\nDisk-Info\r\n")] = b"EXTENDED CPC DSK File\r\nDisk-Info\r\n"
+            header[0x30] = 1
+            header[0x31] = 1
+            header[0x34] = 3
+
+            track = bytearray(0x300)
+            track[: len(b"Track-Info\r\n")] = b"Track-Info\r\n"
+            track[0x100:0x120] = b"\x00PHX        \x00\x00\x00\x10\x02\x03" + (b"\x00" * 14)
+            dsk_path.write_bytes(header + track)
+
+            with patch("project.commands._run_catalog_command", return_value=[]):
+                autocmd = commands._amstrad_autocmd_from_disk(dsk_path, "phX.dsk", ProjectPaths(Path(tmp)))
+
+        self.assertEqual(autocmd, 'run"PHX')
+
 
 if __name__ == "__main__":
     unittest.main()
