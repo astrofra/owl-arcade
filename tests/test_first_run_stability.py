@@ -155,6 +155,17 @@ class FirstRunStabilityTests(unittest.TestCase):
             self.assertEqual(seen_paths, [paths])
             self.assertEqual(machines[0]["productions"], [{"title": "Demo", "filename": ["demo.zip"]}])
 
+    def test_visible_production_entries_does_not_duplicate_short_lists(self):
+        productions = [{"title": "Gryzor", "filename": ["Gryzor.dsk"]}]
+
+        self.assertEqual(platforms.visible_production_entries(productions, 0, limit=10), productions)
+
+    def test_visible_production_entries_wraps_only_when_list_exceeds_limit(self):
+        productions = [{"title": f"Demo {idx}", "filename": [f"demo{idx}.zip"]} for idx in range(12)]
+        visible = platforms.visible_production_entries(productions, 10, limit=5)
+
+        self.assertEqual([entry["title"] for entry in visible], ["Demo 10", "Demo 11", "Demo 0", "Demo 1", "Demo 2"])
+
     def test_amstrad_autocmd_falls_back_to_cpm_for_bin_only_disks(self):
         with patch("project.commands._inspect_amstrad_disk", return_value=[{"filename": "DISC.BIN", "score": 0}]):
             autocmd = commands._amstrad_autocmd_from_disk(Path("demo.dsk"), "Gryzor (CPM).dsk", object())

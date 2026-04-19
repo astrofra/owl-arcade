@@ -2,11 +2,11 @@ import harfang as hg
 
 try:
     from .paths import PATHS
-    from .platforms import build_machine_catalog, load_machine_productions, machine_productions
+    from .platforms import build_machine_catalog, load_machine_productions, machine_productions, visible_production_entries
     from .preflight import has_preflight_errors, print_preflight_report, run_preflight
 except ImportError:
     from paths import PATHS
-    from platforms import build_machine_catalog, load_machine_productions, machine_productions
+    from platforms import build_machine_catalog, load_machine_productions, machine_productions, visible_production_entries
     from preflight import has_preflight_errors, print_preflight_report, run_preflight
 # from fetch_pouet_prods import fetch_pouet_prods
 
@@ -78,9 +78,8 @@ def draw_production_selection(hg, view_id, res_x, res_y, y_ratio, font, font_prg
     shadow_offset = hg.Vec3(res_x / 500.0, res_y / 500.0, 0)
 
     if len(productions) > 0:
-        for i in range(selector_size):
-            j = (i + idx) % len(productions)
-            production_title = productions[j]['title']
+        for i, production in enumerate(visible_production_entries(productions, idx, selector_size)):
+            production_title = production['title']
             hg.DrawText(view_id, font, production_title, font_prg, 'u_tex', 0, hg.Mat4.Identity,
                         hg.Vec3(res_x * 0.05, res_y * (0.45 + (i * 0.04 * y_ratio)), 0) + shadow_offset,
                         hg.DTHA_Left, hg.DTVA_Center, text_uniform_values_shadows, [], text_render_state)

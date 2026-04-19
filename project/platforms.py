@@ -103,3 +103,8 @@ def load_machine_productions(machines, paths=None):
 
 def machine_productions(machine):
     return machine.get("productions", [])
+
+
+def visible_production_entries(productions, idx, limit=10):
+    visible_count = min(limit, len(productions))
+    return [productions[(i + idx) % len(productions)] for i in range(visible_count)]
