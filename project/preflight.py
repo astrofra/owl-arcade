@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
+    from .commands import resolve_amiga_kickstart_rom
     from .paths import PATHS, ProjectPaths
 except ImportError:
+    from commands import resolve_amiga_kickstart_rom
     from paths import PATHS, ProjectPaths
 
 
@@ -91,7 +93,7 @@ def run_preflight(paths=None, machines=None):
     if "start_amiga" in launcher_names:
         winuae = paths.emulator_folder("winuae")
         _warn_if_missing(issues, "missing_winuae", "WinUAE executable is missing.", winuae / "winuae64.exe")
-        _warn_if_missing(issues, "missing_amiga_kickstart", "Amiga Kickstart ROM is missing.", winuae / "roms" / "Kickstart 1.3.rom")
+        _warn_if_missing(issues, "missing_amiga_kickstart", "Amiga Kickstart ROM is missing.", resolve_amiga_kickstart_rom(paths))
 
     if "start_amstrad_cpc" in launcher_names:
         caprice = paths.emulator_folder("caprice")

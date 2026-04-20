@@ -193,6 +193,43 @@ class FirstRunStabilityTests(unittest.TestCase):
             self.assertIs(process, expected_process)
             self.assertEqual(popen.call_args.kwargs["cwd"], str(caprice))
 
+    def test_amiga_launcher_accepts_common_kickstart_13_filenames(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            winuae = paths.emulator_folder("winuae")
+            amiga_rom_folder = winuae / "roms"
+            disk_folder = paths.rom_folder("amiga")
+            amiga_rom_folder.mkdir(parents=True)
+            disk_folder.mkdir(parents=True)
+            (winuae / "winuae64.exe").write_text("")
+            (disk_folder / "demo.adf").write_text("")
+            kickstart_rom = amiga_rom_folder / "Kickstart 1.3 (34.5) (A500-A2500-A3000-CDTV) (Commodore) (1987)[!].rom"
+            kickstart_rom.write_text("")
+
+            expected_process = object()
+            with patch("project.commands.subprocess.Popen", return_value=expected_process) as popen:
+                process = commands.start_amiga(["demo.adf"], paths)
+
+            self.assertIs(process, expected_process)
+            self.assertIn(str(kickstart_rom), popen.call_args.args[0])
+
+    def test_preflight_accepts_common_amiga_kickstart_13_filenames(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            winuae = paths.emulator_folder("winuae")
+            amiga_rom_folder = winuae / "roms"
+            disk_folder = paths.rom_folder("amiga")
+            amiga_rom_folder.mkdir(parents=True)
+            disk_folder.mkdir(parents=True)
+            (winuae / "winuae64.exe").write_text("")
+            (disk_folder / "demo.adf").write_text("")
+            (amiga_rom_folder / "Kickstart 1.3.rom.rom").write_text("")
+            machines = [{"name": "Amiga", "rom_folder": "amiga", "launcher": commands.start_amiga}]
+
+            issues = run_preflight(paths, machines)
+
+            self.assertNotIn("missing_amiga_kickstart", {issue.code for issue in issues})
+
     def test_machine_catalog_is_sorted_and_uses_production_slots(self):
         machines = platforms.build_machine_catalog()
         names = [machine["name"] for machine in machines]
@@ -222,6 +259,25 @@ class FirstRunStabilityTests(unittest.TestCase):
 
             self.assertEqual(seen_paths, [paths])
             self.assertEqual(machines[0]["productions"], [{"title": "Demo", "filename": ["demo.zip"]}])
+
+    def test_load_machine_productions_sorts_entries_alphanumerically(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+
+            def parser(parser_paths):
+                return [
+                    {"title": "Demo 10", "filename": ["demo10.zip"]},
+                    {"title": "alpha", "filename": ["alpha.zip"]},
+                    {"title": "demo 2", "filename": ["demo2.zip"]},
+                ]
+
+            machines = platforms.build_machine_catalog([
+                platforms.MachineDefinition("Demo Machine", rom_folder="demo", parser=parser),
+            ])
+
+            platforms.load_machine_productions(machines, paths)
+
+            self.assertEqual([entry["title"] for entry in machines[0]["productions"]], ["alpha", "demo 2", "Demo 10"])
 
     def test_visible_production_entries_does_not_duplicate_short_lists(self):
         productions = [{"title": "Gryzor", "filename": ["Gryzor.dsk"]}]

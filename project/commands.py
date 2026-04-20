@@ -29,6 +29,49 @@ def _missing_paths(required_paths):
     return [Path(required_path) for required_path in required_paths if not Path(required_path).exists()]
 
 
+AMIGA_KICKSTART_13_NAME = "Kickstart 1.3.rom"
+
+
+def expected_amiga_kickstart_rom(paths=None):
+    paths = _paths(paths)
+    return paths.emulator_folder("winuae") / "roms" / AMIGA_KICKSTART_13_NAME
+
+
+def _is_amiga_kickstart_13_rom(path):
+    if not path.is_file():
+        return False
+
+    filename = path.name.casefold()
+    if not filename.endswith(".rom"):
+        return False
+
+    return (
+        filename == AMIGA_KICKSTART_13_NAME.casefold()
+        or filename.startswith("kickstart 1.3")
+        or filename.startswith("kick13")
+        or ("kickstart" in filename and ("1.3" in filename or "34.5" in filename or "34.005" in filename or "34005" in filename))
+    )
+
+
+def resolve_amiga_kickstart_rom(paths=None):
+    expected_rom = expected_amiga_kickstart_rom(paths)
+    if expected_rom.exists():
+        return expected_rom
+
+    rom_folder = expected_rom.parent
+    if not rom_folder.exists():
+        return expected_rom
+
+    candidates = sorted(
+        (path for path in rom_folder.iterdir() if _is_amiga_kickstart_13_rom(path)),
+        key=lambda path: (len(path.name), path.name.casefold()),
+    )
+    if candidates:
+        return candidates[0]
+
+    return expected_rom
+
+
 def _start_process(label, command, required_paths, paths, cwd=None):
     missing = _missing_paths(required_paths)
     if missing:
@@ -62,7 +105,7 @@ def build_amiga_command(disk_filename, paths=None):
     paths = _paths(paths)
     filenames = _filenames(disk_filename)
     winuae = paths.emulator_folder("winuae")
-    amiga_rom_file = winuae / "roms" / "Kickstart 1.3.rom"
+    amiga_rom_file = resolve_amiga_kickstart_rom(paths)
 
     disk_list = []
     for disk_idx, filename in enumerate(filenames[:4]):
@@ -94,7 +137,7 @@ def start_amiga(disk_filename, paths=None):
     command = build_amiga_command(filenames, paths)
     required_paths = [
         paths.emulator_folder("winuae") / "winuae64.exe",
-        paths.emulator_folder("winuae") / "roms" / "Kickstart 1.3.rom",
+        resolve_amiga_kickstart_rom(paths),
     ]
     required_paths += [paths.rom_folder("amiga") / filename for filename in filenames[:4]]
     return _start_process("Amiga", command, required_paths, paths)

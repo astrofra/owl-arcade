@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import re
 from typing import Callable, Optional
 
 try:
@@ -82,6 +83,32 @@ def machine_get_name(machine):
     return machine.get("name")
 
 
+ALPHANUM_PARTS = re.compile(r"(\d+)")
+
+
+def alphanum_sort_key(value):
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part.casefold())
+        for part in ALPHANUM_PARTS.split(str(value or ""))
+    )
+
+
+def production_get_sort_title(production):
+    title = production.get("title")
+    if title:
+        return title
+
+    filenames = production.get("filename") or []
+    if filenames:
+        return filenames[0]
+
+    return ""
+
+
+def production_alphanum_sort_key(production):
+    return alphanum_sort_key(production_get_sort_title(production))
+
+
 def build_machine_catalog(definitions=None):
     if definitions is None:
         definitions = MACHINE_DEFINITIONS
@@ -97,7 +124,7 @@ def load_machine_productions(machines, paths=None):
         if parser is None:
             machine["productions"] = []
         else:
-            machine["productions"] = parser(paths)
+            machine["productions"] = sorted(parser(paths), key=production_alphanum_sort_key)
     return machines
 
 
