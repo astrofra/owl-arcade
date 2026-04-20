@@ -54,6 +54,7 @@ def fetch_top_pouet_prods(paths=None, platform_keys=None, limit=DEFAULT_TOP_LIMI
         platform_keys=platform_keys or DEFAULT_PLATFORM_KEYS,
         limit=limit,
         download=download,
+        merge_existing=True,
     )
 
 

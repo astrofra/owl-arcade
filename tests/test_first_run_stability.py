@@ -246,6 +246,86 @@ class FirstRunStabilityTests(unittest.TestCase):
 
         self.assertEqual([prod["id"] for prod in selected], ["3", "2"])
 
+    def test_pouet_amiga_config_targets_ocs_ecs_only(self):
+        self.assertEqual(pouet_library.PLATFORM_CONFIGS["amiga"].pouet_platforms, ("Amiga OCS/ECS",))
+
+    def test_pouet_ensure_skips_complete_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            local_file = paths.rom_folder("amiga") / "_pouet" / "123-demo" / "demo.adf"
+            local_file.parent.mkdir(parents=True)
+            local_file.write_text("")
+            paths.db.mkdir(parents=True)
+            with (paths.db / "pouet-library.json").open("w") as manifest_file:
+                json.dump(
+                    {
+                        "platforms": {
+                            "amiga": [
+                                {
+                                    "title": "Demo",
+                                    "filename": ["_pouet/123-demo/demo.adf"],
+                                    "launchable": True,
+                                }
+                            ]
+                        }
+                    },
+                    manifest_file,
+                )
+
+            with patch("project.pouet_library.update_pouet_library") as update:
+                manifest = pouet_library.ensure_default_pouet_library(paths, platform_keys=["amiga"], limit=1)
+
+            update.assert_not_called()
+            self.assertEqual(len(manifest["platforms"]["amiga"]), 1)
+
+    def test_pouet_ensure_refreshes_incomplete_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+
+            with patch("project.pouet_library.update_pouet_library", return_value={"platforms": {}}) as update:
+                pouet_library.ensure_default_pouet_library(paths, platform_keys=["amiga"], limit=1)
+
+            update.assert_called_once()
+            self.assertEqual(update.call_args.kwargs["platform_keys"], ["amiga"])
+            self.assertTrue(update.call_args.kwargs["merge_existing"])
+
+    def test_pouet_update_skips_failed_downloads_until_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = ProjectPaths(Path(tmp) / "repo")
+            dump_path = paths.temp / "prods.json"
+            dump_path.parent.mkdir(parents=True)
+            prods = [
+                {"id": "1", "name": "Broken", "rank": "1", "download": "https://example.invalid/broken.zip", "platforms": {"1": {"name": "Amstrad CPC"}}},
+                {"id": "2", "name": "Ready One", "rank": "2", "download": "https://example.invalid/one.dsk", "platforms": {"1": {"name": "Amstrad CPC"}}},
+                {"id": "3", "name": "Ready Two", "rank": "3", "download": "https://example.invalid/two.dsk", "platforms": {"1": {"name": "Amstrad CPC"}}},
+            ]
+            with dump_path.open("w", encoding="utf-8") as dump_file:
+                json.dump({"prods": prods}, dump_file)
+
+            def fake_download(download_paths, config, prod, session=None):
+                entry = pouet_library.build_manifest_entry(prod, config, download_paths)
+                if prod["id"] == "1":
+                    entry["download"]["status"] = "failed"
+                    entry["launch"]["status"] = "download failed"
+                    return entry
+
+                local_path = download_paths.rom_folder(config.rom_folder) / entry["filename"][0]
+                local_path.parent.mkdir(parents=True)
+                local_path.write_text("")
+                entry["download"]["status"] = "downloaded"
+                return entry
+
+            with patch("project.pouet_library.download_and_prepare_prod", side_effect=fake_download):
+                manifest = pouet_library.update_pouet_library(
+                    paths=paths,
+                    platform_keys=["amstrad_cpc"],
+                    limit=2,
+                    download=True,
+                    dump_path=dump_path,
+                )
+
+            self.assertEqual([entry["id"] for entry in manifest["platforms"]["amstrad_cpc"]], ["2", "3"])
+
     def test_pouet_download_urls_are_normalized_for_storage(self):
         self.assertEqual(
             pouet_library.normalize_download_url("https://files.scene.org/view/parties/demo.zip"),

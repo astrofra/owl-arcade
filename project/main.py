@@ -3,10 +3,12 @@ import harfang as hg
 try:
     from .paths import PATHS
     from .platforms import build_machine_catalog, load_machine_productions, machine_productions, visible_production_entries
+    from .pouet_library import ensure_default_pouet_library
     from .preflight import has_preflight_errors, print_preflight_report, run_preflight
 except ImportError:
     from paths import PATHS
     from platforms import build_machine_catalog, load_machine_productions, machine_productions, visible_production_entries
+    from pouet_library import ensure_default_pouet_library
     from preflight import has_preflight_errors, print_preflight_report, run_preflight
 # from fetch_pouet_prods import fetch_pouet_prods
 
@@ -123,9 +125,10 @@ def main():
     if has_preflight_errors(preflight_issues):
         return 1
 
-    # # Download and store the database of prods found on pouet
-    # machines_pouet = [machine.get('pouet_name') for machine in machines]
-    # fetch_pouet_prods(machines_pouet)
+    try:
+        ensure_default_pouet_library(PATHS)
+    except Exception as exc:
+        print(f"Pouet cache update failed; continuing with local content only: {exc}")
 
     load_machine_productions(machines, PATHS)
 

@@ -22,6 +22,7 @@ POUET_INDEX_URL = "https://data.pouet.net/json.php"
 MANIFEST_FILENAME = "pouet-library.json"
 DEFAULT_PLATFORM_KEYS = ["amstrad_cpc", "amiga"]
 DEFAULT_TOP_LIMIT = 50
+DEFAULT_CANDIDATE_MULTIPLIER = 3
 MAX_LINK_RESOLUTION_DEPTH = 3
 MAX_HTML_BYTES = 1024 * 512
 MAX_RESOLVER_PAGES = 12
@@ -46,7 +47,7 @@ PLATFORM_CONFIGS = {
     "amiga": PouetPlatformConfig(
         key="amiga",
         rom_folder="amiga",
-        pouet_platforms=("Amiga OCS/ECS", "Amiga AGA"),
+        pouet_platforms=("Amiga OCS/ECS",),
         media_extensions=(".adf", ".adz", ".ipf", ".dms"),
     ),
 }
@@ -541,6 +542,18 @@ def load_manifest(paths=None):
         return json.load(manifest_file)
 
 
+def entry_local_path(paths, config, entry):
+    filenames = entry.get("filename") or []
+    if not filenames:
+        return None
+    return paths.rom_folder(config.rom_folder) / filenames[0]
+
+
+def entry_is_available(paths, config, entry):
+    local_path = entry_local_path(paths, config, entry)
+    return local_path is not None and local_path.exists()
+
+
 def load_platform_entries(paths, platform_key):
     manifest = load_manifest(paths)
     entries = manifest.get("platforms", {}).get(platform_key, [])
@@ -548,20 +561,80 @@ def load_platform_entries(paths, platform_key):
     if config is None:
         return entries
 
-    usable_entries = []
-    for entry in entries:
-        filenames = entry.get("filename") or []
-        if not filenames:
-            continue
-        local_path = paths.rom_folder(config.rom_folder) / filenames[0]
-        if local_path.exists():
-            usable_entries.append(entry)
-    return usable_entries
+    return [entry for entry in entries if entry_is_available(paths, config, entry)]
 
 
-def update_pouet_library(paths=None, platform_keys=None, limit=DEFAULT_TOP_LIMIT, download=True, dump_path=None, session=None):
+def platform_cache_count(paths, platform_key):
+    return len(load_platform_entries(paths, platform_key))
+
+
+def missing_platform_cache_keys(paths=None, platform_keys=None, limit=DEFAULT_TOP_LIMIT):
     paths = paths or PATHS
     platform_keys = platform_keys or DEFAULT_PLATFORM_KEYS
+    return [platform_key for platform_key in platform_keys if platform_cache_count(paths, platform_key) < limit]
+
+
+def _validate_platform_keys(platform_keys):
+    unknown_keys = [platform_key for platform_key in platform_keys if platform_key not in PLATFORM_CONFIGS]
+    if unknown_keys:
+        raise ValueError(f"Unknown Pouet platform key(s): {', '.join(unknown_keys)}")
+
+
+def _build_manifest_base(paths, dump_info, merge_existing=False):
+    if merge_existing:
+        manifest = load_manifest(paths)
+        platforms = dict(manifest.get("platforms", {}))
+    else:
+        platforms = {}
+
+    return {
+        "version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": {
+            "index_url": POUET_INDEX_URL,
+            "dump": dump_info,
+        },
+        "platforms": platforms,
+    }
+
+
+def _platform_entries_from_prods(paths, config, selected_prods, limit, download, session=None):
+    entries = []
+    failed_entries = []
+
+    for prod in selected_prods:
+        if download:
+            entry = download_and_prepare_prod(paths, config, prod, session=session)
+            if entry_is_available(paths, config, entry):
+                entries.append(entry)
+            else:
+                failed_entries.append(entry)
+        else:
+            entry = build_manifest_entry(prod, config, paths)
+            entry["download"]["status"] = "not downloaded"
+            entry["launch"]["status"] = "not prepared"
+            entries.append(entry)
+
+        if len(entries) >= limit:
+            break
+
+    if len(entries) < limit:
+        entries.extend(failed_entries[: limit - len(entries)])
+    return entries[:limit]
+
+
+def update_pouet_library(
+    paths=None,
+    platform_keys=None,
+    limit=DEFAULT_TOP_LIMIT,
+    download=True,
+    dump_path=None,
+    session=None,
+    merge_existing=False,
+):
+    paths = paths or PATHS
+    platform_keys = platform_keys or DEFAULT_PLATFORM_KEYS
+    _validate_platform_keys(platform_keys)
     session = session or requests.Session()
 
     if dump_path is None:
@@ -571,29 +644,40 @@ def update_pouet_library(paths=None, platform_keys=None, limit=DEFAULT_TOP_LIMIT
         dump_info = {"filename": dump_path.name, "url": str(dump_path), "size_in_bytes": dump_path.stat().st_size}
 
     prods = load_prods_dump(dump_path)
-    manifest = {
-        "version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "source": {
-            "index_url": POUET_INDEX_URL,
-            "dump": dump_info,
-        },
-        "platforms": {},
-    }
+    manifest = _build_manifest_base(paths, dump_info, merge_existing=merge_existing)
 
     for platform_key in platform_keys:
         config = PLATFORM_CONFIGS[platform_key]
-        selected_prods = select_top_prods(prods, config.pouet_platforms, limit)
-        entries = []
-        for prod in selected_prods:
-            if download:
-                entry = download_and_prepare_prod(paths, config, prod, session=session)
-            else:
-                entry = build_manifest_entry(prod, config, paths)
-                entry["download"]["status"] = "not downloaded"
-                entry["launch"]["status"] = "not prepared"
-            entries.append(entry)
-        manifest["platforms"][platform_key] = entries
+        candidate_limit = limit if not download else max(limit, limit * DEFAULT_CANDIDATE_MULTIPLIER)
+        selected_prods = select_top_prods(prods, config.pouet_platforms, candidate_limit)
+        manifest["platforms"][platform_key] = _platform_entries_from_prods(
+            paths,
+            config,
+            selected_prods,
+            limit,
+            download,
+            session=session,
+        )
 
     write_manifest(manifest, paths)
     return manifest
+
+
+def ensure_default_pouet_library(paths=None, platform_keys=None, limit=DEFAULT_TOP_LIMIT, download=True, session=None):
+    paths = paths or PATHS
+    platform_keys = platform_keys or DEFAULT_PLATFORM_KEYS
+    _validate_platform_keys(platform_keys)
+
+    missing_keys = missing_platform_cache_keys(paths, platform_keys, limit=limit)
+    if not missing_keys:
+        return load_manifest(paths)
+
+    print(f"Updating Pouet cache for: {', '.join(missing_keys)}")
+    return update_pouet_library(
+        paths=paths,
+        platform_keys=missing_keys,
+        limit=limit,
+        download=download,
+        session=session,
+        merge_existing=True,
+    )
