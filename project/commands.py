@@ -29,7 +29,7 @@ def _missing_paths(required_paths):
     return [Path(required_path) for required_path in required_paths if not Path(required_path).exists()]
 
 
-AMIGA_KICKSTART_13_NAME = "Kickstart 1.3.rom"
+AMIGA_KICKSTART_13_NAME = "firmware.file" # "Kickstart 1.3.rom"
 
 
 def expected_amiga_kickstart_rom(paths=None):
